@@ -40,6 +40,22 @@ const GLYPHES = {
   sac: `
     <path d="M22 40 h56 l-5 46 a6 6 0 0 1-6 5 H33 a6 6 0 0 1-6-5 Z" fill="#FFFFFF" fill-opacity=".9"/>
     <path d="M36 40 v-8 a14 14 0 0 1 28 0 v8" fill="none" stroke="#FFFFFF" stroke-opacity=".9" stroke-width="5"/>`,
+  drapeau: `
+    <rect x="20" y="14" width="5" height="74" rx="2.5" fill="#FFFFFF" fill-opacity=".92"/>
+    <path d="M25 20 h56 a4 4 0 0 1 3 6 l-7 12 7 12 a4 4 0 0 1-3 6 H25 Z" fill="#FFFFFF" fill-opacity=".88"/>
+    <rect x="34" y="30" width="38" height="4" rx="2" fill="#000" fill-opacity=".28"/>
+    <rect x="34" y="42" width="26" height="4" rx="2" fill="#000" fill-opacity=".28"/>`,
+  serviette: `
+    <rect x="12" y="24" width="76" height="52" rx="8" fill="#FFFFFF" fill-opacity=".9"/>
+    <rect x="12" y="34" width="76" height="5" fill="#000" fill-opacity=".2"/>
+    <rect x="12" y="46" width="76" height="5" fill="#000" fill-opacity=".2"/>
+    <rect x="12" y="58" width="76" height="5" fill="#000" fill-opacity=".2"/>
+    <path d="M76 24 v52" stroke="#000" stroke-opacity=".18" stroke-width="3"/>`,
+  housse: `
+    <rect x="10" y="44" width="80" height="34" rx="7" fill="#FFFFFF" fill-opacity=".9"/>
+    <rect x="18" y="30" width="30" height="18" rx="6" fill="#FFFFFF" fill-opacity=".7"/>
+    <path d="M10 60 h80" stroke="#000" stroke-opacity=".2" stroke-width="3"/>
+    <path d="M58 44 v34" stroke="#000" stroke-opacity=".16" stroke-width="3"/>`,
 };
 
 function dataUri(svg) {

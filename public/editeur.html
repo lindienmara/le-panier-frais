@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Éditeur — Le Panier Frais</title>
+<title>Éditeur de boutique</title>
 <style>
   :root {
     --fond: #0B0B0B;
@@ -188,6 +188,9 @@
       <label><span class="lab">Numéro WhatsApp (33XXXXXXXXX)</span><input type="text" data-b="whatsapp" /></label>
       <label><span class="lab">Première ligne de la commande</span><input type="text" data-b="accroche" /></label>
       <label><span class="lab">Dépôt GitHub (pseudo/depot)</span><input type="text" data-b="depot" class="mono" placeholder="lindienmara/ma-boutique" /></label>
+        <label><span class="lab">Titre du bloc mis en avant (vide = masqué)</span><input type="text" data-b="enAvant" /></label>
+        <span class="lab">Onglets du bas</span>
+        <div class="rangee" id="onglets-visibles" style="margin-bottom:10px"></div>
     </div>
 
     <div class="bloc">
@@ -276,11 +279,11 @@ const CLE = "editeur-" + location.host;
 const NOMS_COULEURS = {
   rose: "Rose (barres, boutons)", violet: "Violet (dégradés)", vert: "Vert (pastilles)",
   jaune: "Jaune (prix, titres)", cyan: "Cyan (étiquettes)",
-  fond: "Fond de la boutique", fondCarte: "Fond des cartes", bordure: "Traits",
+  halo: "Halo derrière la boutique", fond: "Fond de la boutique", fondCarte: "Fond des cartes", bordure: "Traits",
   texte: "Texte principal", texteDoux: "Texte secondaire",
 };
 
-const GLYPHES_DISPO = ["boite", "etoile", "sac", "salade", "tomate", "patate"];
+const GLYPHES_DISPO = ["boite", "etoile", "sac", "drapeau", "serviette", "housse", "salade", "tomate", "patate"];
 
 // Les champs facultatifs peuvent manquer dans donnees.json : on les complète
 // pour que tous les champs du formulaire aient une valeur.
@@ -291,6 +294,8 @@ function lireDonnees(d) {
       nom: b.nom || "", bandeau: b.bandeau || "", sousTitre: b.sousTitre || "",
       emoji: b.emoji || "", logo: b.logo || "", depot: b.depot || "",
       whatsapp: b.whatsapp || "", accroche: b.accroche || "",
+      enAvant: b.enAvant || "", afficherInfos: b.afficherInfos !== false,
+      afficherLiens: b.afficherLiens !== false, afficherAvis: b.afficherAvis !== false,
       info: Array.isArray(b.info) ? b.info.map((i) => ({ titre: i.titre || "", texte: i.texte || "" })) : [],
       liens: Array.isArray(b.liens) ? b.liens.map((l) => ({ titre: l.titre || "", url: l.url || "" })) : [],
     },
@@ -378,9 +383,22 @@ function dessinerApparence() {
     </div>
     <button class="btn danger mini" data-suppr-lien="${i}" style="margin:-4px 0 12px">Retirer</button>`).join("");
 
+  dessinerOngletsVisibles();
   majApercu();
 }
 
+// Trois boutons pour montrer ou masquer les onglets du bas de la boutique.
+function dessinerOngletsVisibles() {
+  const zone = document.getElementById("onglets-visibles");
+  if (!zone) return;
+  const cles = [["afficherInfos", "INFOS"], ["afficherLiens", "LIENS"], ["afficherAvis", "AVIS"]];
+  zone.innerHTML = cles.map(([k, n]) => {
+    const actif = etat.boutique[k] !== false;
+    return '<button class="btn mini" data-onglet-visible="' + k + '" style="' +
+      (actif ? '' : 'opacity:.5;text-decoration:line-through') + '">' +
+      (actif ? '\u{1F441} ' : '\u{1F6AB} ') + n + '</button>';
+  }).join("");
+}
 function majApercu() {
   const c = etat.couleurs;
   const ap = document.getElementById("apercu");
@@ -565,6 +583,14 @@ export const BOUTIQUE = {
   // Numéro qui reçoit les commandes : format international, sans + ni espaces.
   whatsapp: "${echapJs(b.whatsapp)}",
   accroche: "${echapJs(b.accroche)}",
+
+  // Bloc mis en avant sur l'accueil. Vide = masqué.
+  enAvant: "${echapJs(b.enAvant)}",
+
+  // Onglets du bas de la boutique.
+  afficherInfos: ${b.afficherInfos !== false},
+  afficherLiens: ${b.afficherLiens !== false},
+  afficherAvis: ${b.afficherAvis !== false},
 
   info: [
 ${infos}
@@ -829,6 +855,11 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  if (d.ongletVisible) {
+    const k = d.ongletVisible;
+    etat.boutique[k] = etat.boutique[k] === false;
+    sauver(); dessinerOngletsVisibles(); return;
+  }
   if (b.id === "ajouter-info") { etat.boutique.info.push({ titre: "Nouveau bloc", texte: "À compléter" }); sauver(); dessinerApparence(); return; }
   if (b.id === "ajouter-lien") { etat.boutique.liens.push({ titre: "Nouveau lien", url: "" }); sauver(); dessinerApparence(); return; }
   if (d.supprInfo !== undefined) { etat.boutique.info.splice(+d.supprInfo, 1); sauver(); dessinerApparence(); return; }

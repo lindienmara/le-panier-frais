@@ -116,34 +116,40 @@ function BarreSection({ titre, onRetour }) {
 /* ─────────────────────────── écrans ─────────────────────────── */
 
 function EcranAccueil({ onFamille, onProduit }) {
+  // Le bloc « mis en avant » disparaît complètement si son titre est vide dans
+  // config.js, ou si aucun produit n'est marqué en avant.
+  const montrerEnAvant = !!(BOUTIQUE.enAvant || "").trim() && SELECTION_CHEF.length > 0;
+
   return (
     <>
-      <div className="mx-3 mt-3">
-        <div
-          className="rounded-2xl px-4 py-3 flex items-center gap-3"
-          style={{ background: "#0E0E0E", border: `1px solid ${bordure}` }}
-        >
-          <Star size={18} color={jaune} />
-          <p className="flex-1 text-center" style={{ fontFamily: TITRE, fontSize: 15, color: texte, letterSpacing: "1px" }}>
-            SÉLECTION DU CHEF
-          </p>
-          <span style={{ color: texteDoux, fontSize: 12 }}>▾</span>
-        </div>
+      {montrerEnAvant && (
+        <div className="mx-3 mt-3">
+          <div
+            className="rounded-2xl px-4 py-3 flex items-center gap-3"
+            style={{ background: "#0E0E0E", border: `1px solid ${bordure}` }}
+          >
+            <Star size={18} color={jaune} />
+            <p className="flex-1 text-center" style={{ fontFamily: TITRE, fontSize: 15, color: texte, letterSpacing: "1px" }}>
+              {BOUTIQUE.enAvant}
+            </p>
+            <span style={{ color: texteDoux, fontSize: 12 }}>▾</span>
+          </div>
 
-        <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          {SELECTION_CHEF.map((p) => (
-            <button
-              key={p.ref}
-              onClick={() => onProduit(p.famille, p.gamme, p)}
-              className="flex-shrink-0 rounded-xl px-3 py-2 text-left active:scale-95 transition-transform"
-              style={{ background: fondCarte, border: `1px solid ${bordure}`, minWidth: 148 }}
-            >
-              <p className="text-[12px] font-bold truncate" style={{ color: texte, fontFamily: CORPS }}>{p.nom}</p>
-              <Prix valeur={p.prix} taille={15} />
-            </button>
-          ))}
+          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {SELECTION_CHEF.map((p) => (
+              <button
+                key={p.ref}
+                onClick={() => onProduit(p.famille, p.gamme, p)}
+                className="flex-shrink-0 rounded-xl px-3 py-2 text-left active:scale-95 transition-transform"
+                style={{ background: fondCarte, border: `1px solid ${bordure}`, minWidth: 148 }}
+              >
+                <p className="text-[12px] font-bold truncate" style={{ color: texte, fontFamily: CORPS }}>{p.nom}</p>
+                <Prix valeur={p.prix} taille={15} />
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-col gap-4 px-3 mt-4">
         {FAMILLES.map((f) => (
@@ -504,15 +510,16 @@ export default function Boutique() {
     setOnglet("accueil"); setProduit(null); setGamme(null); setFamille(null);
   };
 
+  // Chaque onglet peut être masqué depuis config.js. Accueil reste toujours là.
   const onglets = [
-    { id: "accueil", nom: "ACCUEIL", Icone: Home },
-    { id: "info", nom: "INFOS", Icone: Info },
-    { id: "liens", nom: "LIENS", Icone: Link2 },
-    { id: "avis", nom: "AVIS", Icone: Star },
-  ];
+    { id: "accueil", nom: "ACCUEIL", Icone: Home, visible: true },
+    { id: "info", nom: "INFOS", Icone: Info, visible: BOUTIQUE.afficherInfos !== false },
+    { id: "liens", nom: "LIENS", Icone: Link2, visible: BOUTIQUE.afficherLiens !== false },
+    { id: "avis", nom: "AVIS", Icone: Star, visible: BOUTIQUE.afficherAvis !== false },
+  ].filter((o) => o.visible);
 
   return (
-    <div className="min-h-screen w-full" style={{ background: `radial-gradient(circle at 50% 0%, #17240F 0%, #060A05 60%)` }}>
+    <div className="min-h-screen w-full" style={{ background: `radial-gradient(circle at 50% 0%, ${COULEURS.halo || "#17240F"} 0%, #060505 62%)` }}>
       <style>{FONTS}</style>
 
       <div className="relative w-full max-w-[560px] mx-auto min-h-screen" style={{ background: fond }}>

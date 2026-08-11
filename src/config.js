@@ -26,6 +26,15 @@ export const BOUTIQUE = {
   accroche: "Bonjour Le Panier Frais, je souhaite commander :",
 
   // Onglet INFO — à compléter avec les vraies informations.
+  // Bloc des produits mis en avant sur l accueil.
+  // Laisse vide pour le faire disparaître complètement.
+  enAvant: "SÉLECTION DU CHEF",
+
+  // Onglets du bas : mets false pour en masquer un.
+  afficherInfos: true,
+  afficherLiens: true,
+  afficherAvis: true,
+
   info: [
     { titre: "Horaires", texte: "À compléter" },
     { titre: "Zone de livraison", texte: "À compléter" },
@@ -43,6 +52,7 @@ export const BOUTIQUE = {
 
 // Palette flashy : rose magenta, violet, vert acide, sur fond vert-noir.
 export const COULEURS = {
+  halo: "#06231F",       // halo coloré derrière la boutique
   fond: "#08130A",
   fondCarte: "#12200F",
   bordure: "#2A3A24",
