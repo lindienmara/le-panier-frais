@@ -456,8 +456,7 @@ function dessinerCatalogue() {
         </div>
         <div class="rangee" style="margin:12px 0">
           <button class="btn mini" data-add-gamme="${fi}">+ Ajouter une gamme</button>
-          <button class="btn mini" data-monter-fam="${fi}" ${fi === 0 ? "disabled" : ""}>↑</button>
-          <button class="btn mini" data-descendre-fam="${fi}" ${fi === etat.familles.length - 1 ? "disabled" : ""}>↓</button>
+          ${boutonsPosition("fam", fi, fi, etat.familles.length)}
           <button class="btn danger mini" data-suppr-fam="${fi}" style="margin-left:auto">Supprimer la famille</button>
         </div>
         ${f.gammes.map((g, gi) => `
@@ -475,6 +474,7 @@ function dessinerCatalogue() {
               </div>
               <div class="rangee" style="margin-bottom:12px">
                 <button class="btn mini" data-add-produit="${fi}.${gi}">+ Ajouter un produit</button>
+                ${boutonsPosition("gam", fi + "." + gi, gi, f.gammes.length)}
                 <button class="btn danger mini" data-suppr-gam="${fi}.${gi}" style="margin-left:auto">Supprimer la gamme</button>
               </div>
               ${g.produits.map((p, pi) => carteProduit(p, fi, gi, pi, g.produits.length)).join("")}
@@ -482,6 +482,18 @@ function dessinerCatalogue() {
           </details>`).join("")}
       </div>
     </details>`).join("");
+}
+
+// Quatre boutons de placement, identiques aux trois niveaux :
+// tout en haut, d'un cran vers le haut, d'un cran vers le bas, tout en bas.
+function boutonsPosition(niveau, idx, i, total) {
+  const b = (action, libelle, titre, off) =>
+    '<button class="btn mini" data-pos="' + niveau + '|' + idx + '|' + action +
+    '" title="' + titre + '"' + (off ? " disabled" : "") + '>' + libelle + '</button>';
+  return b("premier", "\u2912", "Mettre en premier", i === 0) +
+         b("haut", "\u2191", "Monter d'un cran", i === 0) +
+         b("bas", "\u2193", "Descendre d'un cran", i === total - 1) +
+         b("dernier", "\u2913", "Mettre en dernier", i === total - 1);
 }
 
 function carteProduit(p, fi, gi, pi, total) {
@@ -508,8 +520,7 @@ function carteProduit(p, fi, gi, pi, total) {
           <div class="rangee">
             <button class="btn mini" data-stock="${cle}">${p.dispo ? "Marquer épuisé" : "Remettre en vente"}</button>
             <button class="btn mini" data-chef="${cle}">${p.chef ? "★ Sélection du chef" : "☆ Sélection du chef"}</button>
-            <button class="btn mini" data-monter-p="${cle}" ${pi === 0 ? "disabled" : ""}>↑</button>
-            <button class="btn mini" data-descendre-p="${cle}" ${pi === total - 1 ? "disabled" : ""}>↓</button>
+            ${boutonsPosition("prod", cle, pi, total)}
             <button class="btn danger mini" data-suppr-p="${cle}" style="margin-left:auto">Supprimer</button>
           </div>
         </div>
@@ -759,6 +770,13 @@ function sauverFichier() {
 
 /* ───────────────── événements ───────────────── */
 
+// Garde ouverts la famille et la gamme concernées après un redessin, pour ne
+// pas perdre l'endroit où on travaille.
+const ouvrirFG = (fi, gi) => {
+  etat.familles[fi].__ouvert = true;
+  if (gi !== undefined) etat.familles[fi].gammes[gi].__ouvert = true;
+};
+
 const trouverProduit = (cle) => {
   const [fi, gi, pi] = cle.split(".").map(Number);
   return { fi, gi, pi, liste: etat.familles[fi].gammes[gi].produits };
@@ -885,6 +903,23 @@ document.addEventListener("click", (e) => {
     sauver(); dessinerCatalogue(); return;
   }
 
+  if (d.pos) {
+    const [niveau, idx, action] = d.pos.split("|");
+    const n = idx.split(".").map(Number);
+    let liste, i;
+    if (niveau === "fam") { liste = etat.familles; i = n[0]; }
+    else if (niveau === "gam") { liste = etat.familles[n[0]].gammes; i = n[1]; ouvrirFG(n[0]); }
+    else { liste = etat.familles[n[0]].gammes[n[1]].produits; i = n[2]; ouvrirFG(n[0], n[1]); }
+    const j = action === "premier" ? 0
+            : action === "dernier" ? liste.length - 1
+            : action === "haut" ? i - 1 : i + 1;
+    if (j !== i && j >= 0 && j < liste.length) {
+      const [element] = liste.splice(i, 1);
+      liste.splice(j, 0, element);
+      sauver(); dessinerCatalogue();
+    }
+    return;
+  }
   if (d.supprFam !== undefined) {
     if (confirm(`Supprimer la famille « ${etat.familles[+d.supprFam].nom} » et tout ce qu'elle contient ?`)) {
       etat.familles.splice(+d.supprFam, 1); sauver(); dessinerCatalogue(); toast("Famille supprimée");
@@ -922,21 +957,6 @@ document.addEventListener("click", (e) => {
     sauver(); dessinerCatalogue(); return;
   }
 
-  const echanger = (arr, i, j) => { [arr[i], arr[j]] = [arr[j], arr[i]]; };
-  if (d.monterFam !== undefined) { echanger(etat.familles, +d.monterFam, +d.monterFam - 1); sauver(); dessinerCatalogue(); return; }
-  if (d.descendreFam !== undefined) { echanger(etat.familles, +d.descendreFam, +d.descendreFam + 1); sauver(); dessinerCatalogue(); return; }
-  if (d.monterP !== undefined) {
-    const { liste, pi, fi, gi } = trouverProduit(d.monterP);
-    echanger(liste, pi, pi - 1);
-    etat.familles[fi].__ouvert = true; etat.familles[fi].gammes[gi].__ouvert = true;
-    sauver(); dessinerCatalogue(); return;
-  }
-  if (d.descendreP !== undefined) {
-    const { liste, pi, fi, gi } = trouverProduit(d.descendreP);
-    echanger(liste, pi, pi + 1);
-    etat.familles[fi].__ouvert = true; etat.familles[fi].gammes[gi].__ouvert = true;
-    sauver(); dessinerCatalogue(); return;
-  }
 
   if (b.id === "recharger") {
     if (confirm("Effacer tes modifications en cours et repartir de ce qui est réellement en ligne ?")) {
