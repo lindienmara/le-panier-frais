@@ -212,7 +212,14 @@
 
     <div class="bloc">
       <h2>Couleurs</h2>
-      <div class="couleurs" id="couleurs"></div>
+      <span class="lab">Accords prêts à l'emploi</span>
+        <div class="rangee" id="palettes" style="margin-bottom:13px"></div>
+        <span class="lab">Couleurs de la boutique</span>
+        <div class="couleurs" id="couleurs"></div>
+        <details style="margin-top:11px">
+          <summary title="Ouvrir ou replier"><span class="chev"></span><span class="nom">Réglages avancés</span></summary>
+          <div class="corps"><div class="couleurs" id="couleurs-avancees"></div></div>
+        </details>
       <div class="apercu" id="apercu">
         <div class="titre" id="ap-nom"></div>
         <div class="prix" id="ap-prix">12,90 €</div>
@@ -293,12 +300,34 @@ const CLE = "editeur-" + location.host;
 
 // Libellés des couleurs, et dessins de secours disponibles. Valables pour
 // toutes les boutiques : rien à adapter ici.
-const NOMS_COULEURS = {
-  rose: "Rose (barres, boutons)", violet: "Violet (dégradés)", vert: "Vert (pastilles)",
-  jaune: "Jaune (prix, titres)", cyan: "Cyan (étiquettes)",
-  halo: "Halo derrière la boutique", fond: "Fond de la boutique", fondCarte: "Fond des cartes", bordure: "Traits",
-  texte: "Texte principal", texteDoux: "Texte secondaire",
+const COULEURS_PRINCIPALES = {
+  rose: "Couleur principale — barres, boutons",
+  violet: "Couleur secondaire — dégradés",
+  jaune: "Prix et titres — début",
+  vert: "Prix et titres — fin",
+  cyan: "Étiquettes",
+  halo: "Ambiance du fond",
 };
+
+const COULEURS_AVANCEES = {
+  fond: "Fond de la boutique",
+  fondCarte: "Fond des cartes",
+  bordure: "Traits et contours",
+  texte: "Texte principal",
+  texteDoux: "Texte secondaire",
+};
+
+const NOMS_COULEURS = { ...COULEURS_PRINCIPALES, ...COULEURS_AVANCEES };
+
+// Accords prêts à l'emploi : un clic remplace les onze couleurs d'un coup.
+const PALETTES = [
+  { nom: "Rouge et or", v: { rose: "#FB3640", violet: "#7A1420", jaune: "#F7C873", vert: "#F7C873", cyan: "#F7C873", halo: "#2A1012", fond: "#151515", fondCarte: "#1E1E1E", bordure: "#2E2E2E", texte: "#FFFFFF", texteDoux: "#A0A0A0" } },
+  { nom: "Violet et rose", v: { rose: "#FF1B8D", violet: "#7B2FF7", jaune: "#FFE600", vert: "#7CFC00", cyan: "#00E5FF", halo: "#1E1030", fond: "#0B0B0F", fondCarte: "#17161E", bordure: "#2C2A38", texte: "#FFFFFF", texteDoux: "#A9A4B8" } },
+  { nom: "Vert et citron", v: { rose: "#11998E", violet: "#0B5E4F", jaune: "#E8FF6B", vert: "#38EF7D", cyan: "#00E5FF", halo: "#06231F", fond: "#08130A", fondCarte: "#12200F", bordure: "#2A3A24", texte: "#FFFFFF", texteDoux: "#A8C09A" } },
+  { nom: "Bleu et cyan", v: { rose: "#2E5BFF", violet: "#12277A", jaune: "#7DF9FF", vert: "#00E5FF", cyan: "#7DF9FF", halo: "#0A1430", fond: "#0A0F1A", fondCarte: "#131A28", bordure: "#26314A", texte: "#FFFFFF", texteDoux: "#9AA8C0" } },
+  { nom: "Orange et jaune", v: { rose: "#FF512F", violet: "#8A2B08", jaune: "#FFD200", vert: "#FFA300", cyan: "#FFD200", halo: "#2A1206", fond: "#140D07", fondCarte: "#1F150C", bordure: "#34261A", texte: "#FFFFFF", texteDoux: "#C2AC93" } },
+  { nom: "Bordeaux et crème", v: { rose: "#A31621", violet: "#5A0E16", jaune: "#F2E8CF", vert: "#D9C79A", cyan: "#F2E8CF", halo: "#24070B", fond: "#120A0B", fondCarte: "#1C1113", bordure: "#33211F", texte: "#FFFFFF", texteDoux: "#B7A79E" } },
+];
 
 const GLYPHES_DISPO = ["boite", "etoile", "sac", "drapeau", "serviette", "housse", "salade", "tomate", "patate"];
 
@@ -379,12 +408,7 @@ function dessinerApparence() {
     champ.value = etat.boutique[champ.dataset.b] ?? "";
   });
 
-  const zone = document.getElementById("couleurs");
-  zone.innerHTML = Object.keys(NOMS_COULEURS).map((cle) => `
-    <div class="couleur">
-      <input type="color" data-c="${cle}" value="${etat.couleurs[cle]}" aria-label="${NOMS_COULEURS[cle]}" />
-      <div><div class="n">${NOMS_COULEURS[cle]}</div><div class="h">${etat.couleurs[cle]}</div></div>
-    </div>`).join("");
+  dessinerCouleurs();
 
   document.getElementById("infos").innerHTML = etat.boutique.info.map((b, i) => `
     <div class="duo" style="align-items:end">
@@ -416,6 +440,27 @@ function dessinerOngletsVisibles() {
       (actif ? '\u{1F441} ' : '\u{1F6AB} ') + n + '</button>';
   }).join("");
 }
+// Nuanciers, en deux groupes : l'essentiel d'abord, le reste dans « avancés ».
+function dessinerCouleurs() {
+  const carte = (cle, libelle) => `
+    <div class="couleur">
+      <input type="color" data-c="${cle}" value="${etat.couleurs[cle] || "#888888"}" aria-label="${libelle}" />
+      <div><div class="n">${libelle}</div><div class="h">${etat.couleurs[cle] || ""}</div></div>
+    </div>`;
+
+  const zone = document.getElementById("couleurs");
+  if (zone) zone.innerHTML = Object.entries(COULEURS_PRINCIPALES).map(([c, l]) => carte(c, l)).join("");
+  const avancees = document.getElementById("couleurs-avancees");
+  if (avancees) avancees.innerHTML = Object.entries(COULEURS_AVANCEES).map(([c, l]) => carte(c, l)).join("");
+
+  const zoneP = document.getElementById("palettes");
+  if (zoneP) zoneP.innerHTML = PALETTES.map((p, i) => `
+    <button class="btn mini" data-palette="${i}" title="Appliquer l'accord ${p.nom}"
+      style="display:flex;align-items:center;gap:7px">
+      <span style="width:26px;height:14px;border-radius:4px;flex:0 0 auto;
+        background:linear-gradient(90deg, ${p.v.rose}, ${p.v.violet})"></span>${p.nom}</button>`).join("");
+}
+
 function majApercu() {
   const c = etat.couleurs;
   const ap = document.getElementById("apercu");
@@ -907,6 +952,13 @@ document.addEventListener("click", (e) => {
     const k = d.ongletVisible;
     etat.boutique[k] = etat.boutique[k] === false;
     sauver(); dessinerOngletsVisibles(); return;
+  }
+  if (d.palette !== undefined) {
+    const p = PALETTES[+d.palette];
+    Object.assign(etat.couleurs, p.v);
+    sauver(); dessinerApparence();
+    toast("Accord « " + p.nom + " » appliqué");
+    return;
   }
   if (b.id === "ajouter-info") { etat.boutique.info.push({ titre: "Nouveau bloc", texte: "À compléter" }); sauver(); dessinerApparence(); return; }
   if (b.id === "ajouter-lien") { etat.boutique.liens.push({ titre: "Nouveau lien", url: "" }); sauver(); dessinerApparence(); return; }
