@@ -71,36 +71,27 @@ function fondBariole(l, h, c1, c2) {
     ${confettis}`;
 }
 
-// Grande bannière d'une famille, avec son nom en gros par-dessus.
+// Bannière d'une famille. Si une vraie photo est renseignée dans le
+// catalogue, c'est elle qui est utilisée ; sinon on dessine un fond bariolé.
+// Le nom de la famille est écrit par-dessus par App.jsx, pas dans l'image :
+// comme ça il reste lisible quelle que soit la photo.
 export function visuelFamille(famille) {
+  if (famille.image) return famille.image;
   const [c1, c2] = famille.couleurs;
-  const nom = famille.nom;
-  // Le titre doit tenir dans la largeur, quel que soit le nombre de lettres.
-  const taille = nom.length > 13 ? 62 : nom.length > 9 ? 78 : 96;
   const glyphe = GLYPHES[famille.glyphe] || GLYPHES.salade;
 
   return dataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="760" height="340">
-    <defs>
-      <linearGradient id="bas" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#000" stop-opacity="0"/>
-        <stop offset="1" stop-color="#000" stop-opacity=".62"/>
-      </linearGradient>
-    </defs>
     ${fondBariole(760, 340, c1, c2)}
     <g transform="translate(30 12) scale(2.4)">${glyphe}</g>
     <g transform="translate(490 12) scale(2.4)">${glyphe}</g>
-    <rect y="150" width="760" height="190" fill="url(#bas)"/>
-    <text x="380" y="300" text-anchor="middle"
-      font-family="Impact, 'Arial Black', 'Arial Narrow', sans-serif"
-      font-size="${taille}" letter-spacing="2"
-      fill="#FFE600" stroke="#160B22" stroke-width="9" paint-order="stroke">${nom}</text>
   </svg>`);
 }
 
-// Vignette d'un produit : le légume en grand sur fond bariolé.
-export function visuelProduit(produit, couleurs) {
+// Vignette d'un produit : sa photo si elle existe, sinon un visuel dessiné.
+export function visuelProduit(produit, couleurs, glypheFamille) {
+  if (produit && produit.image) return produit.image;
   const [c1, c2] = couleurs;
-  const glyphe = GLYPHES[produit.glyphe] || GLYPHES[produit.familleGlyphe] || GLYPHES.salade;
+  const glyphe = GLYPHES[glypheFamille] || GLYPHES[(produit || {}).glyphe] || GLYPHES.salade;
   return dataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
     ${fondBariole(500, 500, c1, c2)}
     <g transform="translate(100 100) scale(3)">${glyphe}</g>

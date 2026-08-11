@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import {
   ChevronLeft, ChevronRight, Search, ShoppingCart, Plus, Minus, X,
-  Home, Info, Link2, Star, MessageCircle, Maximize2,
+  Home, Info, Link2, Star, MessageCircle, Maximize2, PlayCircle,
 } from "lucide-react";
 import { BOUTIQUE, COULEURS } from "./config.js";
 import { FAMILLES, SELECTION_CHEF } from "./catalogue.js";
@@ -124,8 +124,24 @@ function EcranAccueil({ onFamille, onProduit }) {
             className="relative rounded-2xl overflow-hidden active:scale-[0.98] transition-transform"
             style={{ border: `2px solid ${f.couleurs[0]}`, boxShadow: `0 0 24px ${f.couleurs[0]}33` }}
           >
-            <img src={visuelFamille(f)} alt={f.nom} className="w-full block" />
+            <img src={visuelFamille(f)} alt={f.nom} className="w-full aspect-[760/340] object-cover block" />
             <span className="absolute top-2 right-2 text-[22px]">{f.emoji}</span>
+            {/* Le titre est écrit ici, pas dans l'image : il reste lisible même
+                si la photo change. */}
+            <span
+              className="absolute inset-x-0 bottom-0 pb-4 pt-10 px-3 flex items-end justify-center"
+              style={{ backgroundImage: "linear-gradient(0deg, #000000B0 15%, transparent 100%)" }}
+            >
+              <span
+                style={{
+                  fontFamily: TITRE, color: jaune, letterSpacing: "1px", lineHeight: 1,
+                  fontSize: f.nom.length > 13 ? 26 : f.nom.length > 9 ? 32 : 38,
+                  WebkitTextStroke: "3px #160B22", paintOrder: "stroke",
+                }}
+              >
+                {f.nom}
+              </span>
+            </span>
           </button>
         ))}
       </div>
@@ -224,7 +240,7 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
           >
             <div className="relative">
               <img
-                src={visuelProduit({ glyphe: famille.glyphe }, famille.couleurs)}
+                src={visuelProduit(p, famille.couleurs, famille.glyphe)}
                 alt={p.nom}
                 className="w-full aspect-square object-cover block"
                 style={{ opacity: p.dispo ? 1 : 0.4 }}
@@ -251,9 +267,9 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
   );
 }
 
-function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom }) {
+function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVideo }) {
   const [qte, setQte] = useState(1);
-  const image = visuelProduit({ glyphe: famille.glyphe }, famille.couleurs);
+  const image = visuelProduit(produit, famille.couleurs, famille.glyphe);
 
   return (
     <>
@@ -276,6 +292,19 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom }) {
             <span className="absolute top-3 left-3"><Etiquette couleur="#888">Épuisé</Etiquette></span>
           )}
         </button>
+
+        {produit.video && (
+          <button
+            onClick={() => onVideo(produit)}
+            className="w-full mt-3 py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            style={{ background: fondCarte, border: `2px solid ${cyan}`, boxShadow: `0 0 16px ${cyan}33` }}
+          >
+            <PlayCircle size={20} color={cyan} />
+            <span style={{ fontFamily: TITRE, fontSize: 16, color: cyan, letterSpacing: ".5px" }}>
+              VOIR LA VIDÉO
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="px-4 mt-4">
@@ -413,6 +442,7 @@ export default function Boutique() {
   const [panier, setPanier] = useState([]);
   const [panierOuvert, setPanierOuvert] = useState(false);
   const [zoom, setZoom] = useState(null);
+  const [video, setVideo] = useState(null);
 
   const nbArticles = panier.reduce((s, i) => s + i.qty, 0);
 
@@ -515,7 +545,7 @@ export default function Boutique() {
           {onglet === "avis" && <EcranAvis />}
           {onglet === "accueil" && (
             produit ? (
-              <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onZoom={setZoom} />
+              <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onZoom={setZoom} onVideo={setVideo} />
             ) : gamme ? (
               <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
             ) : famille ? (
@@ -620,6 +650,31 @@ export default function Boutique() {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {/* vidéo du produit */}
+        {video && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.96)" }} onClick={() => setVideo(null)}>
+            <video
+              src={video.video}
+              controls
+              autoPlay
+              playsInline
+              className="max-w-full max-h-full rounded-xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setVideo(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: "#1A1A1ACC", border: `1px solid ${bordure}` }}
+              aria-label="Fermer la vidéo"
+            >
+              <X size={18} color={texte} />
+            </button>
+            <p className="absolute bottom-5 left-0 right-0 text-center text-[12px] px-6" style={{ color: texteDoux, fontFamily: CORPS }}>
+              {video.nom} — tape à côté pour fermer
+            </p>
           </div>
         )}
 

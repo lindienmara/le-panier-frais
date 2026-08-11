@@ -4,6 +4,13 @@
 //
 // Les prix sont des exemples : remplace-les par les tiens.
 // chef: true met le produit dans la « Sélection du chef » de l'accueil.
+//
+// Champs facultatifs :
+//   image  sur une famille  → "/familles/salades.jpg", remplace la bannière dessinée
+//   image  sur un produit   → "/produits/batavia.jpg", remplace le visuel dessiné
+//   video  sur un produit   → "/videos/batavia.mp4", fait apparaître un bouton
+//                             « VOIR LA VIDÉO » sur la fiche produit
+// Les fichiers vont dans public/familles, public/produits et public/videos.
 
 export const FAMILLES = [
   {
