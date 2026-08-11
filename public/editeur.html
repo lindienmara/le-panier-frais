@@ -163,6 +163,12 @@
   <h1>Éditeur de boutique</h1>
   <p class="lede">Change l'apparence et le catalogue sans écrire une ligne. À la fin, deux boutons : un pour l'apparence, un pour le catalogue.</p>
 
+  <div class="rangee" style="margin-top:11px">
+    <button class="btn mini" id="recharger">↻ Repartir de la boutique en ligne</button>
+    <button class="btn mini" id="ouvrir-sauvegarde">Ouvrir une sauvegarde</button>
+    <input type="file" id="fichier-sauvegarde" accept=".json,application/json" hidden />
+  </div>
+
   <div class="onglets" role="tablist">
     <button role="tab" aria-selected="true" data-onglet="apparence">APPARENCE</button>
     <button role="tab" aria-selected="false" data-onglet="catalogue">CATALOGUE</button>
@@ -181,6 +187,7 @@
       </div>
       <label><span class="lab">Numéro WhatsApp (33XXXXXXXXX)</span><input type="text" data-b="whatsapp" /></label>
       <label><span class="lab">Première ligne de la commande</span><input type="text" data-b="accroche" /></label>
+      <label><span class="lab">Dépôt GitHub (pseudo/depot)</span><input type="text" data-b="depot" class="mono" placeholder="lindienmara/ma-boutique" /></label>
     </div>
 
     <div class="bloc">
@@ -220,9 +227,10 @@
 
 <div class="barre-bas">
   <div class="inner">
+    <button class="btn" id="apercu" style="flex:1.15">👁 Prévisualiser</button>
     <button class="btn principal" id="pub-config">Publier l'apparence</button>
     <button class="btn principal" id="pub-catalogue">Publier le catalogue</button>
-    <button class="btn" id="sauver">💾</button>
+    <button class="btn" id="sauver" style="flex:0 0 auto">💾</button>
   </div>
 </div>
 
@@ -247,14 +255,24 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ══════════════ SEULE PARTIE À ADAPTER POUR UNE AUTRE BOUTIQUE ══════════════
-const NOM_BOUTIQUE = "Le Panier Frais";
-const DEPOT = "lindienmara/le-panier-frais";
-// ═══════════════════════════ FIN DE LA PARTIE À ADAPTER ═══════════════════════
+// ─────────────────────────────────────────────────────────────────────────
+// Cet éditeur n'a RIEN à adapter : il lit l'identité, les couleurs et le
+// catalogue dans donnees.json, un fichier produit automatiquement à chaque
+// publication de la boutique. Le même fichier fonctionne donc pour toutes les
+// boutiques bâties sur cette base, et il affiche toujours ce qui est
+// réellement en ligne — jamais une copie périmée.
+// ─────────────────────────────────────────────────────────────────────────
+
+let NOM_BOUTIQUE = "Boutique";
+let DEPOT = "";
+let DEPART = null;
+let etat = null;
 
 const LIEN = (f) => `https://github.com/${DEPOT}/edit/main/src/${f}`;
-const CLE = "editeur-" + DEPOT;
+const CLE = "editeur-" + location.host;
 
+// Libellés des couleurs, et dessins de secours disponibles. Valables pour
+// toutes les boutiques : rien à adapter ici.
 const NOMS_COULEURS = {
   rose: "Rose (barres, boutons)", violet: "Violet (dégradés)", vert: "Vert (pastilles)",
   jaune: "Jaune (prix, titres)", cyan: "Cyan (étiquettes)",
@@ -262,72 +280,37 @@ const NOMS_COULEURS = {
   texte: "Texte principal", texteDoux: "Texte secondaire",
 };
 
-const GLYPHES_DISPO = ["salade", "tomate", "patate"];
+const GLYPHES_DISPO = ["boite", "etoile", "sac", "salade", "tomate", "patate"];
 
-// État de départ, remplacé par la sauvegarde locale si elle existe.
-const DEPART = {
-  boutique: {
-    nom: "LE PANIER FRAIS", bandeau: "MEILLEURE SÉLECTION 2025/26 🏆", sousTitre: "primeur en ligne",
-    emoji: "🥗", logo: "", whatsapp: "33766384736",
-    accroche: "Bonjour Le Panier Frais, je souhaite commander :",
-    info: [
-      { titre: "Horaires", texte: "À compléter" },
-      { titre: "Zone de livraison", texte: "À compléter" },
-      { titre: "Délai de préparation", texte: "À compléter" },
-      { titre: "Moyens de paiement", texte: "À compléter" },
-    ],
-    liens: [
-      { titre: "Notre canal Telegram", url: "" },
-      { titre: "Nous écrire sur WhatsApp", url: "" },
-      { titre: "Instagram", url: "" },
-    ],
-  },
-  couleurs: {
-    fond: "#08130A", fondCarte: "#12200F", bordure: "#2A3A24", texte: "#FFFFFF",
-    texteDoux: "#A8C09A", rose: "#FF1B8D", violet: "#7B2FF7", vert: "#7CFC00",
-    jaune: "#FFE600", cyan: "#00E5FF",
-  },
-  familles: [
-    { id: "salades", nom: "SALADES", emoji: "🥬", glyphe: "salade", image: "", couleurs: ["#7CFC00", "#00A86B"], gammes: [
-      { id: "feuilles", nom: "FEUILLES TENDRES", etiquette: "FR", sousTitre: "Récolte du matin", produits: [
-        { ref: "SAL-BAT", nom: "Batavia", unite: "la pièce", prix: 1.6, dispo: true, chef: true, image: "", video: "", description: "Feuilles croquantes et légèrement ondulées, goût doux. La salade à tout faire." },
-        { ref: "SAL-CHE", nom: "Feuille de chêne", unite: "la pièce", prix: 1.8, dispo: true, chef: false, image: "", video: "", description: "Feuilles découpées, très tendres, saveur douce. Belle dans une assiette." },
-        { ref: "SAL-ROQ", nom: "Roquette", unite: "le sachet de 125 g", prix: 2.4, dispo: true, chef: true, image: "", video: "", description: "Goût poivré marqué. Parfaite sur une pizza sortie du four ou avec du parmesan." },
-        { ref: "SAL-MAC", nom: "Mâche", unite: "le sachet de 150 g", prix: 2.9, dispo: false, chef: false, image: "", video: "", description: "Petites rosettes tendres, goût doux de noisette." },
-      ]},
-      { id: "croquantes", nom: "CROQUANTES", etiquette: "FR", sousTitre: "Pour les salades composées", produits: [
-        { ref: "SAL-SUC", nom: "Sucrine", unite: "la pièce", prix: 1.5, dispo: true, chef: false, image: "", video: "", description: "Petite, dense et sucrée. Se mange aussi en feuilles, à la main." },
-        { ref: "SAL-ROM", nom: "Romaine", unite: "la pièce", prix: 1.9, dispo: true, chef: false, image: "", video: "", description: "Feuilles allongées et très croquantes. L'incontournable de la César." },
-        { ref: "SAL-ICE", nom: "Iceberg", unite: "la pièce", prix: 1.7, dispo: true, chef: false, image: "", video: "", description: "Très croquante et désaltérante, elle tient bien en burger." },
-      ]},
-    ]},
-    { id: "tomates", nom: "TOMATES", emoji: "🍅", glyphe: "tomate", image: "", couleurs: ["#FF1B4B", "#FF7A00"], gammes: [
-      { id: "anciennes", nom: "VARIÉTÉS ANCIENNES", etiquette: "FR", sousTitre: "De saison, pleine terre", produits: [
-        { ref: "TOM-COE", nom: "Cœur de Bœuf", unite: "le kilo", prix: 4.9, dispo: true, chef: true, image: "", video: "", description: "Grosse tomate charnue, très peu de pépins. La reine de la tomate mozzarella." },
-        { ref: "TOM-CRI", nom: "Noire de Crimée", unite: "le kilo", prix: 5.4, dispo: true, chef: false, image: "", video: "", description: "Chair sombre et fondante, goût sucré et profond." },
-        { ref: "TOM-ZEB", nom: "Green Zebra", unite: "le kilo", prix: 5.2, dispo: false, chef: false, image: "", video: "", description: "Verte striée, légèrement acidulée. Elle surprend toujours." },
-      ]},
-      { id: "apero", nom: "APÉRO & GRAPPE", etiquette: "FR", sousTitre: "À croquer", produits: [
-        { ref: "TOM-CER", nom: "Cerise rouge", unite: "la barquette de 250 g", prix: 2.6, dispo: true, chef: true, image: "", video: "", description: "Petites, fermes et sucrées. Elles ne passent jamais l'apéritif." },
-        { ref: "TOM-CEJ", nom: "Cerise jaune", unite: "la barquette de 250 g", prix: 2.9, dispo: true, chef: false, image: "", video: "", description: "Plus douce que la rouge, moins acide. Jolie en mélange." },
-        { ref: "TOM-COC", nom: "Cocktail en grappe", unite: "le kilo", prix: 3.8, dispo: true, chef: false, image: "", video: "", description: "Calibre intermédiaire, vendue en grappe. Bon équilibre sucre-acidité." },
-      ]},
-    ]},
-    { id: "pommes-de-terre", nom: "POMMES DE TERRE", emoji: "🥔", glyphe: "patate", image: "", couleurs: ["#FFB300", "#8D5A2B"], gammes: [
-      { id: "chair-ferme", nom: "À CHAIR FERME", etiquette: "FR", sousTitre: "Vapeur, sautées, salades", produits: [
-        { ref: "PDT-CHA", nom: "Charlotte", unite: "le kilo", prix: 2.4, dispo: true, chef: true, image: "", video: "", description: "Chair ferme qui tient parfaitement à la cuisson. Vapeur ou rissolée." },
-        { ref: "PDT-AMA", nom: "Amandine", unite: "le kilo", prix: 2.6, dispo: true, chef: false, image: "", video: "", description: "Peau fine, chair ferme et fondante. Excellente à la vapeur." },
-        { ref: "PDT-RAT", nom: "Ratte", unite: "le kilo", prix: 4.2, dispo: true, chef: false, image: "", video: "", description: "Petite et allongée, goût de noisette. La plus fine du panier." },
-      ]},
-      { id: "farineuses", nom: "FRITES & PURÉE", etiquette: "FR", sousTitre: "Chair farineuse", produits: [
-        { ref: "PDT-BIN", nom: "Bintje", unite: "le sac de 2,5 kg", prix: 4.5, dispo: true, chef: false, image: "", video: "", description: "La référence pour les frites et la purée. Chair farineuse et fondante." },
-        { ref: "PDT-AGR", nom: "Agria", unite: "le sac de 2,5 kg", prix: 4.9, dispo: false, chef: false, image: "", video: "", description: "Polyvalente, très bonne au four et en gratin." },
-      ]},
-    ]},
-  ],
-};
+// Les champs facultatifs peuvent manquer dans donnees.json : on les complète
+// pour que tous les champs du formulaire aient une valeur.
+function lireDonnees(d) {
+  const b = d.BOUTIQUE || {};
+  return {
+    boutique: {
+      nom: b.nom || "", bandeau: b.bandeau || "", sousTitre: b.sousTitre || "",
+      emoji: b.emoji || "", logo: b.logo || "", depot: b.depot || "",
+      whatsapp: b.whatsapp || "", accroche: b.accroche || "",
+      info: Array.isArray(b.info) ? b.info.map((i) => ({ titre: i.titre || "", texte: i.texte || "" })) : [],
+      liens: Array.isArray(b.liens) ? b.liens.map((l) => ({ titre: l.titre || "", url: l.url || "" })) : [],
+    },
+    couleurs: { ...(d.COULEURS || {}) },
+    familles: (d.FAMILLES || []).map((f) => ({
+      nom: f.nom || "", emoji: f.emoji || "", glyphe: f.glyphe || "boite", image: f.image || "",
+      couleurs: [(f.couleurs || [])[0] || "#FF1B8D", (f.couleurs || [])[1] || "#7B2FF7"],
+      gammes: (f.gammes || []).map((g) => ({
+        nom: g.nom || "", etiquette: g.etiquette || "", sousTitre: g.sousTitre || "",
+        produits: (g.produits || []).map((p) => ({
+          ref: p.ref || "", nom: p.nom || "", unite: p.unite || "",
+          prix: Number(p.prix) || 0, dispo: p.dispo !== false, chef: !!p.chef,
+          image: p.image || "", video: p.video || "", description: p.description || "",
+        })),
+      })),
+    })),
+  };
+}
 
-let etat = charger();
+
 
 function charger() {
   try {
@@ -576,6 +559,9 @@ export const BOUTIQUE = {
   emoji: "${echapJs(b.emoji)}",
   logo: "${echapJs(b.logo)}",
 
+  // Dépôt GitHub de cette boutique, lu par l'éditeur pour publier.
+  depot: "${echapJs(b.depot)}",
+
   // Numéro qui reçoit les commandes : format international, sans + ni espaces.
   whatsapp: "${echapJs(b.whatsapp)}",
   accroche: "${echapJs(b.accroche)}",
@@ -593,6 +579,59 @@ export const COULEURS = {
 ${couleurs}
 };
 `;
+}
+
+// Deux gammes peuvent porter le même nom : on garantit des identifiants
+// distincts, sinon la boutique confondrait leurs listes de produits.
+function idsUniques(noms) {
+  const vus = new Map();
+  return noms.map((n) => {
+    const base = simplifier(n);
+    const compte = (vus.get(base) || 0) + 1;
+    vus.set(base, compte);
+    return compte === 1 ? base : `${base}-${compte}`;
+  });
+}
+
+// Structure identique à donnees.json, pour l'aperçu comme pour le code.
+function donneesCompletes() {
+  const idsFam = idsUniques(etat.familles.map((f) => f.nom));
+  return {
+    BOUTIQUE: { ...etat.boutique },
+    COULEURS: { ...etat.couleurs },
+    FAMILLES: etat.familles.map((f, fi) => {
+      const idsGam = idsUniques(f.gammes.map((g) => g.nom));
+      return {
+        id: idsFam[fi], nom: f.nom, emoji: f.emoji, glyphe: f.glyphe, image: f.image,
+        couleurs: [f.couleurs[0], f.couleurs[1]],
+        gammes: f.gammes.map((g, gi) => ({
+          id: idsGam[gi], nom: g.nom, etiquette: g.etiquette, sousTitre: g.sousTitre,
+          produits: g.produits.map((p) => ({
+            ref: p.ref, nom: p.nom, unite: p.unite, prix: Number(p.prix) || 0,
+            dispo: !!p.dispo, chef: !!p.chef,
+            image: (p.image || "").trim(), video: (p.video || "").trim(),
+            description: (p.description || "").trim(),
+          })),
+        })),
+      };
+    }),
+  };
+}
+
+// Le brouillon voyage après le dièse de l'adresse : il ne quitte pas le
+// navigateur, et l'aperçu marche même si l'éditeur est hébergé ailleurs.
+function encoderBrouillon(donnees) {
+  const octets = new TextEncoder().encode(JSON.stringify(donnees));
+  let binaire = "";
+  octets.forEach((o) => { binaire += String.fromCharCode(o); });
+  return btoa(binaire);
+}
+
+function apercu() {
+  const utiles = etat.familles.reduce((s, f) => s + f.gammes.reduce((t, g) => t + g.produits.length, 0), 0);
+  if (!utiles) { toast("Ajoute au moins un produit avant de prévisualiser"); return; }
+  const adresse = (typeof ADRESSE_BOUTIQUE !== "undefined" && ADRESSE_BOUTIQUE) ? ADRESSE_BOUTIQUE : "./";
+  window.open(`${adresse}?apercu=1#${encoderBrouillon(donneesCompletes())}`, "_blank", "noopener");
 }
 
 function genererCatalogue() {
@@ -726,6 +765,25 @@ document.addEventListener("input", (e) => {
 
 document.addEventListener("change", (e) => {
   const t = e.target;
+  if (t.id === "fichier-sauvegarde" && t.files && t.files[0]) {
+    const lecteur = new FileReader();
+    lecteur.onload = () => {
+      try {
+        const d = JSON.parse(lecteur.result);
+        const e2 = d.etat || d;
+        if (!e2 || !e2.boutique || !e2.couleurs || !Array.isArray(e2.familles)) throw new Error("format inattendu");
+        etat = e2;
+        sauver(); dessinerApparence(); dessinerCatalogue();
+        toast("Sauvegarde chargée");
+      } catch (err) {
+        alert("Ce fichier n'est pas une sauvegarde de boutique. Choisis un fichier créé par le bouton 💾.");
+      }
+    };
+    lecteur.onerror = () => alert("Lecture du fichier impossible.");
+    lecteur.readAsText(t.files[0]);
+    t.value = "";
+    return;
+  }
   if (t.dataset.photoFam !== undefined && t.files && t.files[0]) {
     const fi = +t.dataset.photoFam;
     const zone = document.querySelector(`[data-res-fam="${fi}"]`);
@@ -849,6 +907,16 @@ document.addEventListener("click", (e) => {
     sauver(); dessinerCatalogue(); return;
   }
 
+  if (b.id === "recharger") {
+    if (confirm("Effacer tes modifications en cours et repartir de ce qui est réellement en ligne ?")) {
+      etat = structuredClone(DEPART);
+      sauver(); dessinerApparence(); dessinerCatalogue();
+      toast("Rechargé depuis la boutique en ligne");
+    }
+    return;
+  }
+  if (b.id === "ouvrir-sauvegarde") { document.getElementById("fichier-sauvegarde").click(); return; }
+  if (b.id === "apercu") { apercu(); return; }
   if (b.id === "pub-config") { publier("config.js"); return; }
   if (b.id === "pub-catalogue") { publier("catalogue.js"); return; }
   if (b.id === "sauver") { sauverFichier(); return; }
@@ -861,10 +929,43 @@ document.getElementById("sortie").addEventListener("click", (e) => {
   if (e.target.id === "sortie") e.currentTarget.classList.remove("ouvert");
 });
 
-document.getElementById("marque").textContent = NOM_BOUTIQUE;
-document.title = "Éditeur — " + NOM_BOUTIQUE;
-dessinerApparence();
-dessinerCatalogue();
+function panne(message, detail) {
+  document.querySelector(".wrap").insertAdjacentHTML("afterbegin",
+    `<div class="bloc" style="border-color:var(--rouge)">
+       <h2 style="color:var(--rouge)">Boutique illisible</h2>
+       <p class="lede">${message}</p>
+       ${detail ? `<p class="avert" style="margin-top:8px">${detail}</p>` : ""}
+     </div>`);
+}
+
+async function demarrer() {
+  try {
+    const r = await fetch("donnees.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    DEPART = lireDonnees(await r.json());
+  } catch (e) {
+    panne(
+      "Le fichier <b>donnees.json</b> est introuvable. Cette boutique a été publiée avant que l'éditeur sache lire ses données : il suffit de la republier une fois pour que le fichier apparaisse.",
+      "Détail technique : " + e.message
+    );
+    return;
+  }
+
+  NOM_BOUTIQUE = DEPART.boutique.nom || "Boutique";
+  DEPOT = DEPART.boutique.depot || "";
+  etat = charger();
+
+  document.getElementById("marque").textContent = NOM_BOUTIQUE;
+  document.title = "Éditeur — " + NOM_BOUTIQUE;
+  if (!DEPOT) {
+    panne("Le dépôt GitHub de cette boutique n'est pas renseigné, donc les boutons « Publier » ne pourront pas ouvrir GitHub.",
+      "Remplis le champ « Dépôt GitHub » à l'étape Identité, publie l'apparence, et ce message disparaîtra.");
+  }
+  dessinerApparence();
+  dessinerCatalogue();
+}
+
+demarrer();
 </script>
 </body>
 </html>

@@ -3,18 +3,47 @@ import {
   ChevronLeft, ChevronRight, Search, ShoppingCart, Plus, Minus, X,
   Home, Info, Link2, Star, MessageCircle, Maximize2, PlayCircle,
 } from "lucide-react";
-import { BOUTIQUE, COULEURS } from "./config.js";
-import { FAMILLES, SELECTION_CHEF } from "./catalogue.js";
+import { BOUTIQUE as BOUTIQUE_PUBLIEE, COULEURS as COULEURS_PUBLIEES } from "./config.js";
+import { FAMILLES as FAMILLES_PUBLIEES } from "./catalogue.js";
 import { visuelFamille, visuelProduit } from "./visuels.js";
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap');`;
+
+// APERÇU — l'éditeur ouvre la boutique avec le brouillon dans l'adresse, après
+// le dièse : .../?apercu=1#<données>. La partie après le dièse ne quitte jamais
+// le navigateur, et ce mécanisme fonctionne même quand l'éditeur est hébergé
+// ailleurs que la boutique. Sans ce paramètre, rien ne change.
+function brouillon() {
+  try {
+    if (new URLSearchParams(location.search).get("apercu") !== "1") return null;
+    const charge = location.hash.replace(/^#/, "");
+    if (!charge) return null;
+    const binaire = atob(charge);
+    const octets = Uint8Array.from(binaire, (c) => c.charCodeAt(0));
+    const d = JSON.parse(new TextDecoder().decode(octets));
+    if (!d || !d.BOUTIQUE || !d.COULEURS || !Array.isArray(d.FAMILLES)) return null;
+    return d;
+  } catch (e) {
+    return null;
+  }
+}
+
+const APERCU = brouillon();
+const BOUTIQUE = APERCU ? { ...BOUTIQUE_PUBLIEE, ...APERCU.BOUTIQUE } : BOUTIQUE_PUBLIEE;
+const COULEURS = APERCU ? { ...COULEURS_PUBLIEES, ...APERCU.COULEURS } : COULEURS_PUBLIEES;
+const FAMILLES = APERCU ? APERCU.FAMILLES : FAMILLES_PUBLIEES;
+
+const TOUS_PRODUITS = FAMILLES.flatMap((f) =>
+  f.gammes.flatMap((g) => g.produits.map((p) => ({ ...p, famille: f, gamme: g })))
+);
+const SELECTION_CHEF = TOUS_PRODUITS.filter((p) => p.chef);
 
 const { fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, cyan } = COULEURS;
 const DEGRADE = `linear-gradient(90deg, ${rose}, ${violet})`;
 const TITRE = "'Anton', 'Arial Narrow', Impact, sans-serif";
 const CORPS = "'Inter', -apple-system, 'Segoe UI', sans-serif";
 
-document.title = BOUTIQUE.nom;
+document.title = (APERCU ? "Aperçu — " : "") + BOUTIQUE.nom;
 
 const telegram = window.Telegram && window.Telegram.WebApp;
 if (telegram) {
@@ -490,6 +519,13 @@ export default function Boutique() {
 
         {/* bandeau et entête */}
         <div className="sticky top-0 z-20">
+          {APERCU && (
+            <div className="text-center py-1.5 px-3" style={{ background: "#FFC93C" }}>
+              <p style={{ fontFamily: CORPS, fontSize: 11, fontWeight: 800, color: "#1A1200", letterSpacing: ".3px" }}>
+                APERÇU — brouillon non publié, tes clients ne voient pas ceci
+              </p>
+            </div>
+          )}
           <div className="text-center py-1.5" style={{ backgroundImage: DEGRADE }}>
             <p style={{ fontFamily: CORPS, fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: ".5px" }}>
               {BOUTIQUE.bandeau}

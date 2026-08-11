@@ -29,6 +29,17 @@ const GLYPHES = {
     <ellipse cx="59" cy="62" rx="3.5" ry="2.5" fill="#8D5A2B"/>
     <ellipse cx="65" cy="48" rx="3" ry="2" fill="#8D5A2B"/>
     <ellipse cx="45" cy="65" rx="3" ry="2" fill="#8D5A2B"/>`,
+  // Formes neutres, pour une boutique qui ne vend pas de légumes.
+  boite: `
+    <path d="M50 22 L86 38 L50 54 L14 38 Z" fill="#FFFFFF" fill-opacity=".92"/>
+    <path d="M14 38 L50 54 L50 84 L14 68 Z" fill="#FFFFFF" fill-opacity=".68"/>
+    <path d="M86 38 L50 54 L50 84 L86 68 Z" fill="#FFFFFF" fill-opacity=".5"/>`,
+  etoile: `
+    <path d="M50 16 L61 41 L88 44 L68 62 L74 89 L50 75 L26 89 L32 62 L12 44 L39 41 Z"
+      fill="#FFFFFF" fill-opacity=".92"/>`,
+  sac: `
+    <path d="M22 40 h56 l-5 46 a6 6 0 0 1-6 5 H33 a6 6 0 0 1-6-5 Z" fill="#FFFFFF" fill-opacity=".9"/>
+    <path d="M36 40 v-8 a14 14 0 0 1 28 0 v8" fill="none" stroke="#FFFFFF" stroke-opacity=".9" stroke-width="5"/>`,
 };
 
 function dataUri(svg) {

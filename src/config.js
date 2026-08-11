@@ -8,6 +8,10 @@ export const BOUTIQUE = {
   bandeau: "MEILLEURE SÉLECTION 2025/26 🏆",
   sousTitre: "primeur en ligne",
 
+  // Dépôt GitHub de cette boutique, au format "pseudo/depot". C'est ce qui
+  // permet à l'éditeur d'ouvrir le bon fichier au moment de publier.
+  depot: "lindienmara/le-panier-frais",
+
   // Logo affiché en haut. Deux possibilités :
   //   emoji  : un emoji, rien à installer — laisse logo vide
   //   logo   : un fichier déposé dans public/, ex. "/logo.jpg" (prioritaire)
