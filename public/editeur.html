@@ -194,9 +194,9 @@
         <label><span class="lab">Emoji du logo</span><input type="text" data-b="emoji" maxlength="4" /></label>
         <label><span class="lab">Ou fichier logo</span><input type="text" data-b="logo" placeholder="/logo.jpg" /></label>
       </div>
-      <label><span class="lab">Image de fond de la boutique (facultatif)</span><input type="text" data-b="fondImage" placeholder="/fond.jpg" /></label>
+      <label><span class="lab">Image de fond de la boutique (facultatif)</span><input type="text" data-b="fondImage" placeholder="/produits/fond.jpg" /></label>
       <div class="media">
-        <p>Choisis une image : réduite à <b>1400 px</b>, à déposer dans <b>public</b> sur GitHub. Un voile sombre est ajouté automatiquement pour que le texte reste lisible.</p>
+        <p>Choisis une image : réduite à <b>1400 px</b>, à déposer dans <b>public/produits</b>. Un voile sombre est ajouté automatiquement pour que le texte reste lisible.</p>
         <input type="file" accept="image/*" id="photo-fond" />
         <div class="resultat" id="res-fond"></div>
       </div>
@@ -465,9 +465,9 @@ function dessinerCatalogue() {
           <label><span class="lab">Couleur 1</span><input type="text" data-fam="c0" data-i="${fi}" value="${echapAttr(f.couleurs[0])}" /></label>
           <label><span class="lab">Couleur 2</span><input type="text" data-fam="c1" data-i="${fi}" value="${echapAttr(f.couleurs[1])}" /></label>
         </div>
-        <label><span class="lab">Photo de bannière (facultatif)</span><input type="text" data-fam="image" data-i="${fi}" value="${echapAttr(f.image)}" placeholder="/familles/salades.jpg" /></label>
+        <label><span class="lab">Photo de bannière (facultatif)</span><input type="text" data-fam="image" data-i="${fi}" value="${echapAttr(f.image)}" placeholder="/produits/nom.jpg" /></label>
         <div class="media">
-          <p>Choisis une photo : je la réduis à <b>1000 px</b> et je te la rends allégée, à déposer dans <b>public/familles</b>.</p>
+          <p>Choisis une photo : réduite à <b>1000 px</b>, à déposer dans <b>public/produits</b> — le même dossier que les produits.</p>
           <input type="file" accept="image/*" data-photo-fam="${fi}" />
           <div class="resultat" data-res-fam="${fi}"></div>
         </div>
@@ -850,10 +850,10 @@ document.addEventListener("change", (e) => {
   }
   if (t.id === "photo-fond" && t.files && t.files[0]) {
     preparerImage(t.files[0], 1400, "fond", document.getElementById("res-fond"), (nom, info) => {
-      etat.boutique.fondImage = "/" + nom;
+      etat.boutique.fondImage = "/produits/" + nom;
       sauver(); dessinerApparence();
       const z = document.getElementById("res-fond");
-      if (z) { z.style.color = "var(--vert)"; z.textContent = nom + " — " + info + ". Dépose-le dans public sur GitHub."; }
+      if (z) { z.style.color = "var(--vert)"; z.textContent = nom + " — " + info + ". Dépose-le dans public/produits sur GitHub."; }
       toast("Image de fond prête");
     });
     return;
@@ -862,11 +862,11 @@ document.addEventListener("change", (e) => {
     const fi = +t.dataset.photoFam;
     const zone = document.querySelector(`[data-res-fam="${fi}"]`);
     preparerImage(t.files[0], 1000, simplifier(etat.familles[fi].nom), zone, (nom, info) => {
-      etat.familles[fi].image = "/familles/" + nom;
+      etat.familles[fi].image = "/produits/" + nom;
       etat.familles[fi].__ouvert = true;
       sauver(); dessinerCatalogue();
       const z = document.querySelector(`[data-res-fam="${fi}"]`);
-      if (z) { z.style.color = "var(--vert)"; z.textContent = `${nom} — ${info}. Dépose-le dans public/familles sur GitHub.`; }
+      if (z) { z.style.color = "var(--vert)"; z.textContent = `${nom} — ${info}. Dépose-le dans public/produits sur GitHub.`; }
       toast("Photo prête");
     });
   }
