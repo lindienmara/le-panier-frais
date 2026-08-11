@@ -102,9 +102,18 @@
   details[open] { border-color: var(--violet); }
   summary { padding: 13px 14px; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
   summary::-webkit-details-marker { display: none; }
-  summary .chev { color: var(--doux); font-size: .8rem; }
   summary .nom { font-family: var(--titre); text-transform: uppercase; font-size: 1.05rem; flex: 1; }
   summary .compte { font-size: .78rem; color: var(--doux); }
+  summary .chev {
+    flex: 0 0 auto; width: 24px; height: 24px; border-radius: 7px;
+    background: var(--carte2); border: 1px solid var(--ligne);
+    display: flex; align-items: center; justify-content: center;
+    font-size: .72rem; color: var(--doux);
+  }
+  summary .chev::before { content: "\25B8"; }
+  details[open] > summary .chev::before { content: "\25BE"; }
+  details[open] > summary .chev { color: var(--texte); }
+
   .corps { padding: 0 14px 14px; }
 
   details.gamme { background: var(--carte2); margin: 10px 0; }
@@ -184,6 +193,14 @@
       <div class="duo">
         <label><span class="lab">Emoji du logo</span><input type="text" data-b="emoji" maxlength="4" /></label>
         <label><span class="lab">Ou fichier logo</span><input type="text" data-b="logo" placeholder="/logo.jpg" /></label>
+      </div>
+      <label><span class="lab">Image de fond de la boutique (facultatif)</span><input type="text" data-b="fondImage" placeholder="/fond.jpg" /></label>
+      <div class="media">
+        <p>Choisis une image : réduite à <b>1400 px</b>, à déposer dans <b>public</b> sur GitHub. Un voile sombre est ajouté automatiquement pour que le texte reste lisible.</p>
+        <input type="file" accept="image/*" id="photo-fond" />
+        <div class="resultat" id="res-fond"></div>
+      </div>
+      <div class="duo" style="display:none">
       </div>
       <label><span class="lab">Numéro WhatsApp (33XXXXXXXXX)</span><input type="text" data-b="whatsapp" /></label>
       <label><span class="lab">Première ligne de la commande</span><input type="text" data-b="accroche" /></label>
@@ -292,7 +309,7 @@ function lireDonnees(d) {
   return {
     boutique: {
       nom: b.nom || "", bandeau: b.bandeau || "", sousTitre: b.sousTitre || "",
-      emoji: b.emoji || "", logo: b.logo || "", depot: b.depot || "",
+      emoji: b.emoji || "", logo: b.logo || "", depot: b.depot || "", fondImage: b.fondImage || "",
       whatsapp: b.whatsapp || "", accroche: b.accroche || "",
       enAvant: b.enAvant || "", afficherInfos: b.afficherInfos !== false,
       afficherLiens: b.afficherLiens !== false, afficherAvis: b.afficherAvis !== false,
@@ -429,8 +446,8 @@ function dessinerCatalogue() {
 
   document.getElementById("familles").innerHTML = etat.familles.map((f, fi) => `
     <details ${f.__ouvert ? "open" : ""} data-f="${fi}">
-      <summary>
-        <span class="chev">▸</span>
+      <summary title="Ouvrir ou replier">
+        <span class="chev"></span>
         <span style="font-size:20px">${f.emoji || "📦"}</span>
         <span class="nom">${echapTexte(f.nom)}</span>
         <span class="compte">${f.gammes.length} gammes</span>
@@ -461,8 +478,8 @@ function dessinerCatalogue() {
         </div>
         ${f.gammes.map((g, gi) => `
           <details class="gamme" ${g.__ouvert ? "open" : ""}>
-            <summary>
-              <span class="chev">▸</span>
+            <summary title="Ouvrir ou replier">
+              <span class="chev"></span>
               <span class="nom">${echapTexte(g.nom)}</span>
               <span class="compte">${g.produits.length} produits</span>
             </summary>
@@ -587,6 +604,9 @@ export const BOUTIQUE = {
   // Logo : un emoji, ou un fichier déposé dans public/ (prioritaire).
   emoji: "${echapJs(b.emoji)}",
   logo: "${echapJs(b.logo)}",
+
+  // Image de fond de la boutique, dans public/. Vide = simple halo coloré.
+  fondImage: "${echapJs(b.fondImage)}",
 
   // Dépôt GitHub de cette boutique, lu par l'éditeur pour publier.
   depot: "${echapJs(b.depot)}",
@@ -826,6 +846,16 @@ document.addEventListener("change", (e) => {
     lecteur.onerror = () => alert("Lecture du fichier impossible.");
     lecteur.readAsText(t.files[0]);
     t.value = "";
+    return;
+  }
+  if (t.id === "photo-fond" && t.files && t.files[0]) {
+    preparerImage(t.files[0], 1400, "fond", document.getElementById("res-fond"), (nom, info) => {
+      etat.boutique.fondImage = "/" + nom;
+      sauver(); dessinerApparence();
+      const z = document.getElementById("res-fond");
+      if (z) { z.style.color = "var(--vert)"; z.textContent = nom + " — " + info + ". Dépose-le dans public sur GitHub."; }
+      toast("Image de fond prête");
+    });
     return;
   }
   if (t.dataset.photoFam !== undefined && t.files && t.files[0]) {

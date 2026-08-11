@@ -39,6 +39,19 @@ const TOUS_PRODUITS = FAMILLES.flatMap((f) =>
 const SELECTION_CHEF = TOUS_PRODUITS.filter((p) => p.chef);
 
 const { fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, cyan } = COULEURS;
+
+// Image de fond facultative, posée derrière toute la boutique. Un voile sombre
+// est ajouté par-dessus pour que les textes restent lisibles, et la colonne
+// centrale devient légèrement transparente pour laisser voir l'image.
+const FOND_IMAGE = (BOUTIQUE.fondImage || "").trim();
+const FOND_PAGE = FOND_IMAGE
+  ? {
+      backgroundImage: `linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.78)), url("${FOND_IMAGE}")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundAttachment: "fixed",
+    }
+  : { background: `radial-gradient(circle at 50% 0%, ${COULEURS.halo || "#17240F"} 0%, #060505 62%)` };
 const DEGRADE = `linear-gradient(90deg, ${rose}, ${violet})`;
 const TITRE = "'Anton', 'Arial Narrow', Impact, sans-serif";
 const CORPS = "'Inter', -apple-system, 'Segoe UI', sans-serif";
@@ -519,10 +532,13 @@ export default function Boutique() {
   ].filter((o) => o.visible);
 
   return (
-    <div className="min-h-screen w-full" style={{ background: `radial-gradient(circle at 50% 0%, ${COULEURS.halo || "#17240F"} 0%, #060505 62%)` }}>
+    <div className="min-h-screen w-full" style={FOND_PAGE}>
       <style>{FONTS}</style>
 
-      <div className="relative w-full max-w-[560px] mx-auto min-h-screen" style={{ background: fond }}>
+      <div
+        className="relative w-full max-w-[560px] mx-auto min-h-screen"
+        style={{ background: FOND_IMAGE ? fond + "D9" : fond }}
+      >
 
         {/* bandeau et entête */}
         <div className="sticky top-0 z-20">

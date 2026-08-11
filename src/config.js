@@ -18,6 +18,9 @@ export const BOUTIQUE = {
   emoji: "🥗",
   logo: "",
 
+  // Image de fond de la boutique, dans public/. Vide = simple halo colore.
+  fondImage: "",
+
   // Numéro qui reçoit les commandes : format international, sans + ni espaces.
   // Le même que la boutique Mapuche Arts : les commandes des deux boutiques
   // arrivent sur le même WhatsApp. C'est l'accroche ci-dessous qui permet de
