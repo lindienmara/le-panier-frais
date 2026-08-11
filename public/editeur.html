@@ -196,7 +196,7 @@
       </div>
       <label><span class="lab">Image de fond de la boutique (facultatif)</span><input type="text" data-b="fondImage" placeholder="/produits/fond.jpg" /></label>
       <div class="media">
-        <p>Choisis une image : réduite à <b>1400 px</b>, à déposer dans <b>public/produits</b>. Un voile sombre est ajouté automatiquement pour que le texte reste lisible.</p>
+        <p>Choisis une image : réduite à <b>1400 px</b>, à déposer dans <b>public/produits</b>. Un voile sombre est ajouté automatiquement pour que le texte reste lisible. Si ton navigateur ajoute <b>(1)</b> au nom du fichier, renomme-le avant de l envoyer.</p>
         <input type="file" accept="image/*" id="photo-fond" />
         <div class="resultat" id="res-fond"></div>
       </div>
@@ -512,7 +512,7 @@ function dessinerCatalogue() {
         </div>
         <label><span class="lab">Photo de bannière (facultatif)</span><input type="text" data-fam="image" data-i="${fi}" value="${echapAttr(f.image)}" placeholder="/produits/nom.jpg" /></label>
         <div class="media">
-          <p>Choisis une photo : réduite à <b>1000 px</b>, à déposer dans <b>public/produits</b> — le même dossier que les produits.</p>
+          <p>Choisis une photo : réduite à <b>1000 px</b>, à déposer dans <b>public/produits</b> — le même dossier que les produits. Si ton navigateur ajoute <b>(1)</b> au nom du fichier, renomme-le avant de l envoyer.</p>
           <input type="file" accept="image/*" data-photo-fam="${fi}" />
           <div class="resultat" data-res-fam="${fi}"></div>
         </div>
@@ -588,7 +588,7 @@ function carteProduit(p, fi, gi, pi, total) {
         </div>
       </div>
       <div class="media">
-        <p>Photo du produit → réduite à <b>700 px</b>, à déposer dans <b>public/produits</b>.</p>
+        <p>Photo du produit → réduite à <b>700 px</b>, à déposer dans <b>public/produits</b>. Si ton navigateur ajoute <b>(1)</b> au nom du fichier, renomme-le avant de l envoyer.</p>
         <input type="file" accept="image/*" data-photo-p="${cle}" />
         <div class="resultat" data-res-p="${cle}"></div>
       </div>
