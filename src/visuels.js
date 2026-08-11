@@ -1,0 +1,108 @@
+// VISUELS
+// -------
+// Les images sont dessinées ici, en SVG, et intégrées directement dans la page.
+// Aucune n'est chargée depuis un autre site : c'est ce qui garantit qu'elles
+// s'affichent partout, y compris dans le navigateur intégré de Telegram.
+
+const GLYPHES = {
+  salade: `
+    <g stroke="#14411A" stroke-width="2.5">
+      <ellipse cx="50" cy="60" rx="36" ry="28" fill="#2E7D32"/>
+      <ellipse cx="26" cy="50" rx="20" ry="21" fill="#388E3C"/>
+      <ellipse cx="74" cy="50" rx="20" ry="21" fill="#388E3C"/>
+      <ellipse cx="50" cy="40" rx="25" ry="22" fill="#4CAF50"/>
+      <ellipse cx="34" cy="64" rx="15" ry="13" fill="#66BB6A"/>
+      <ellipse cx="66" cy="64" rx="15" ry="13" fill="#66BB6A"/>
+      <ellipse cx="50" cy="57" rx="16" ry="14" fill="#A5D6A7"/>
+    </g>`,
+  tomate: `
+    <rect x="47.5" y="17" width="5" height="13" rx="2.5" fill="#33691E"/>
+    <circle cx="50" cy="60" r="30" fill="#E53935"/>
+    <ellipse cx="39" cy="50" rx="10" ry="8" fill="#EF5350"/>
+    <ellipse cx="50" cy="28" rx="5" ry="9" fill="#2E7D32"/>
+    <ellipse cx="37" cy="32" rx="10" ry="5" fill="#2E7D32" transform="rotate(-22 37 32)"/>
+    <ellipse cx="63" cy="32" rx="10" ry="5" fill="#2E7D32" transform="rotate(22 63 32)"/>`,
+  patate: `
+    <ellipse cx="50" cy="55" rx="35" ry="25" fill="#C08B4E" transform="rotate(-12 50 55)"/>
+    <ellipse cx="41" cy="45" rx="11" ry="7" fill="#D6A96E"/>
+    <ellipse cx="37" cy="50" rx="4" ry="3" fill="#8D5A2B"/>
+    <ellipse cx="59" cy="62" rx="3.5" ry="2.5" fill="#8D5A2B"/>
+    <ellipse cx="65" cy="48" rx="3" ry="2" fill="#8D5A2B"/>
+    <ellipse cx="45" cy="65" rx="3" ry="2" fill="#8D5A2B"/>`,
+};
+
+function dataUri(svg) {
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace(/\s+/g, " "));
+}
+
+// Fond bariolé commun à tous les visuels : halos colorés, rayures et confettis.
+function fondBariole(l, h, c1, c2) {
+  const confettis = [
+    [0.12, 0.18, 7, "#FFE600"], [0.86, 0.22, 6, "#00E5FF"], [0.28, 0.82, 5, "#FF1B8D"],
+    [0.72, 0.86, 8, "#7CFC00"], [0.52, 0.12, 5, "#FF7A00"], [0.06, 0.62, 6, "#7B2FF7"],
+    [0.94, 0.66, 5, "#FFE600"], [0.40, 0.94, 6, "#00E5FF"],
+  ]
+    .map(([x, y, r, c]) => `<circle cx="${(x * l).toFixed(0)}" cy="${(y * h).toFixed(0)}" r="${r}" fill="${c}" fill-opacity=".55"/>`)
+    .join("");
+
+  return `
+    <defs>
+      <radialGradient id="g1" cx=".2" cy=".18" r=".85">
+        <stop offset="0" stop-color="${c1}" stop-opacity=".95"/>
+        <stop offset="1" stop-color="${c1}" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="g2" cx=".85" cy=".8" r=".9">
+        <stop offset="0" stop-color="${c2}" stop-opacity=".95"/>
+        <stop offset="1" stop-color="${c2}" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="g3" cx=".55" cy=".5" r=".6">
+        <stop offset="0" stop-color="#7B2FF7" stop-opacity=".55"/>
+        <stop offset="1" stop-color="#7B2FF7" stop-opacity="0"/>
+      </radialGradient>
+      <pattern id="ray" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(38)">
+        <rect width="11" height="34" fill="#FFFFFF" fill-opacity=".07"/>
+      </pattern>
+    </defs>
+    <rect width="${l}" height="${h}" fill="#160B22"/>
+    <rect width="${l}" height="${h}" fill="url(#g3)"/>
+    <rect width="${l}" height="${h}" fill="url(#g1)"/>
+    <rect width="${l}" height="${h}" fill="url(#g2)"/>
+    <rect width="${l}" height="${h}" fill="url(#ray)"/>
+    ${confettis}`;
+}
+
+// Grande bannière d'une famille, avec son nom en gros par-dessus.
+export function visuelFamille(famille) {
+  const [c1, c2] = famille.couleurs;
+  const nom = famille.nom;
+  // Le titre doit tenir dans la largeur, quel que soit le nombre de lettres.
+  const taille = nom.length > 13 ? 62 : nom.length > 9 ? 78 : 96;
+  const glyphe = GLYPHES[famille.glyphe] || GLYPHES.salade;
+
+  return dataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" width="760" height="340">
+    <defs>
+      <linearGradient id="bas" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#000" stop-opacity="0"/>
+        <stop offset="1" stop-color="#000" stop-opacity=".62"/>
+      </linearGradient>
+    </defs>
+    ${fondBariole(760, 340, c1, c2)}
+    <g transform="translate(30 12) scale(2.4)">${glyphe}</g>
+    <g transform="translate(490 12) scale(2.4)">${glyphe}</g>
+    <rect y="150" width="760" height="190" fill="url(#bas)"/>
+    <text x="380" y="300" text-anchor="middle"
+      font-family="Impact, 'Arial Black', 'Arial Narrow', sans-serif"
+      font-size="${taille}" letter-spacing="2"
+      fill="#FFE600" stroke="#160B22" stroke-width="9" paint-order="stroke">${nom}</text>
+  </svg>`);
+}
+
+// Vignette d'un produit : le légume en grand sur fond bariolé.
+export function visuelProduit(produit, couleurs) {
+  const [c1, c2] = couleurs;
+  const glyphe = GLYPHES[produit.glyphe] || GLYPHES[produit.familleGlyphe] || GLYPHES.salade;
+  return dataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+    ${fondBariole(500, 500, c1, c2)}
+    <g transform="translate(100 100) scale(3)">${glyphe}</g>
+  </svg>`);
+}
