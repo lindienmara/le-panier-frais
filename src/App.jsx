@@ -38,6 +38,11 @@ const FAMILLES = APERCU ? APERCU.FAMILLES : FAMILLES_PUBLIEES;
 // panier. C'est le seul champ qui distingue les deux.
 const EST_VIDEOS = (f) => f.type === "videos";
 
+// Un produit peut porter plusieurs photos. « images » est la liste complète,
+// « image » la première — gardée pour les catalogues écrits avant la galerie.
+const GALERIE = (p) =>
+  Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+
 const TOUS_PRODUITS = FAMILLES.filter((f) => !EST_VIDEOS(f)).flatMap((f) =>
   f.gammes.flatMap((g) => g.produits.map((p) => ({ ...p, famille: f, gamme: g })))
 );
@@ -367,9 +372,11 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
   );
 }
 
-function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVideo }) {
+function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, onVideo }) {
   const [qte, setQte] = useState(1);
   const image = visuelProduit(produit, famille.couleurs, famille.glyphe);
+  const photos = GALERIE(produit);
+  const aPlus = photos.length > 1 || !!(produit.description || "").trim() || !!(produit.video || "").trim();
 
   return (
     <>
@@ -377,7 +384,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVi
 
       <div className="px-3 mt-3">
         <button
-          onClick={() => onZoom({ image, nom: produit.nom })}
+          onClick={() => onOuvrir(produit)}
           className="relative w-full rounded-2xl overflow-hidden block"
           style={{ border: `2px solid ${famille.couleurs[0]}`, boxShadow: `0 0 24px ${famille.couleurs[0]}33` }}
         >
@@ -386,12 +393,36 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVi
             className="absolute bottom-3 right-3 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold"
             style={{ background: "#000000AA", color: texte, border: `1px solid ${bordure}` }}
           >
-            <Maximize2 size={12} /> Agrandir
+            <Maximize2 size={12} /> {aPlus ? "Tout voir" : "Agrandir"}
           </span>
+          {photos.length > 1 && (
+            <span
+              className="absolute bottom-3 left-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold"
+              style={{ background: "#000000AA", color: cyan, border: `1px solid ${cyan}`, fontFamily: CORPS }}
+            >
+              {photos.length} photos
+            </span>
+          )}
           {!produit.dispo && (
             <span className="absolute top-3 left-3"><Etiquette couleur="#888">Épuisé</Etiquette></span>
           )}
         </button>
+
+        {photos.length > 1 && (
+          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {photos.map((src, n) => (
+              <button
+                key={n}
+                onClick={() => onOuvrir(produit, n)}
+                className="flex-shrink-0 rounded-lg overflow-hidden active:scale-95 transition-transform"
+                style={{ border: `1px solid ${bordure}` }}
+                aria-label={`Photo ${n + 1}`}
+              >
+                <img src={src} alt="" className="w-16 h-16 object-cover block" />
+              </button>
+            ))}
+          </div>
+        )}
 
         {produit.video && (
           <button
@@ -600,6 +631,125 @@ function Intro({ onFini }) {
   );
 }
 
+// ══════════ VISIONNEUSE DU PRODUIT ══════════
+// Un appui sur la photo ouvre tout ce que le produit contient : ses photos,
+// l'une après l'autre, son descriptif, et sa vidéo s'il en a une. Chaque partie
+// n'apparaît que si elle existe.
+function Visionneuse({ produit, famille, depart = 0, onFermer }) {
+  const [i, setI] = useState(depart);
+  const [surVideo, setSurVideo] = useState(false);
+  const doigtX = useRef(null);
+
+  const photos = GALERIE(produit);
+  const affichees = photos.length ? photos : [visuelProduit(produit, famille.couleurs, famille.glyphe)];
+  const plusieurs = affichees.length > 1;
+  const aVideo = !!(produit.video || "").trim();
+
+  const suivante = () => setI((n) => (n + 1) % affichees.length);
+  const precedente = () => setI((n) => (n - 1 + affichees.length) % affichees.length);
+
+  // Clavier sur ordinateur, glissement du doigt sur téléphone.
+  useEffect(() => {
+    const touche = (e) => {
+      if (e.key === "Escape") onFermer();
+      else if (e.key === "ArrowRight" && plusieurs) suivante();
+      else if (e.key === "ArrowLeft" && plusieurs) precedente();
+    };
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  }, [plusieurs, affichees.length]);
+
+  const debutGlisse = (e) => { doigtX.current = e.touches[0].clientX; };
+  const finGlisse = (e) => {
+    if (doigtX.current === null || !plusieurs || surVideo) return;
+    const ecart = e.changedTouches[0].clientX - doigtX.current;
+    if (Math.abs(ecart) > 45) (ecart < 0 ? suivante : precedente)();
+    doigtX.current = null;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,.97)" }}>
+      {/* barre du haut */}
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2 flex-shrink-0">
+        <p className="flex-1 truncate" style={{ fontFamily: TITRE, fontSize: 18, color: texte }}>
+          {produit.nom}
+        </p>
+        {plusieurs && !surVideo && (
+          <span className="px-2 py-1 rounded-lg text-[11px] font-bold flex-shrink-0"
+            style={{ background: "#1A1A1A", color: texteDoux, border: `1px solid ${bordure}`, fontFamily: CORPS }}>
+            {i + 1} / {affichees.length}
+          </span>
+        )}
+        <button onClick={onFermer} className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "#1A1A1ACC", border: `1px solid ${bordure}` }} aria-label="Fermer">
+          <X size={17} color={texte} />
+        </button>
+      </div>
+
+      {/* la photo, ou la vidéo */}
+      <div className="relative flex-1 min-h-0 flex items-center justify-center px-3"
+        onTouchStart={debutGlisse} onTouchEnd={finGlisse}>
+        {surVideo ? (
+          <video src={produit.video} controls autoPlay playsInline className="max-w-full max-h-full rounded-xl" />
+        ) : (
+          <>
+            <img src={affichees[i]} alt={produit.nom} className="max-w-full max-h-full object-contain rounded-xl" />
+            {plusieurs && (
+              <>
+                <button onClick={precedente} aria-label="Photo précédente"
+                  className="absolute left-4 w-11 h-11 rounded-full flex items-center justify-center active:scale-90"
+                  style={{ background: "#000000B8", border: `1px solid ${bordure}` }}>
+                  <ChevronLeft size={22} color={texte} />
+                </button>
+                <button onClick={suivante} aria-label="Photo suivante"
+                  className="absolute right-4 w-11 h-11 rounded-full flex items-center justify-center active:scale-90"
+                  style={{ background: "#000000B8", border: `1px solid ${bordure}` }}>
+                  <ChevronRight size={22} color={texte} />
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* pastilles des photos */}
+      {plusieurs && !surVideo && (
+        <div className="flex gap-2 overflow-x-auto px-3 pt-3 flex-shrink-0" style={{ scrollbarWidth: "none" }}>
+          {affichees.map((src, n) => (
+            <button key={n} onClick={() => setI(n)} className="flex-shrink-0 rounded-lg overflow-hidden"
+              style={{ border: `2px solid ${n === i ? famille.couleurs[0] : bordure}`, opacity: n === i ? 1 : 0.6 }}>
+              <img src={src} alt="" className="w-14 h-14 object-cover block" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* descriptif et vidéo */}
+      <div className="px-4 pt-3 pb-5 flex-shrink-0" style={{ maxHeight: "34vh", overflowY: "auto" }}>
+        {aVideo && (
+          <button onClick={() => setSurVideo((v) => !v)}
+            className="w-full mb-3 py-2.5 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            style={{ background: CARTE, border: `2px solid ${cyan}` }}>
+            <PlayCircle size={18} color={cyan} />
+            <span style={{ fontFamily: TITRE, fontSize: 15, color: cyan, letterSpacing: ".5px" }}>
+              {surVideo ? "REVENIR AUX PHOTOS" : "VOIR LA VIDÉO"}
+            </span>
+          </button>
+        )}
+        {(produit.description || "").trim() ? (
+          <p className="text-[13.5px]" style={{ color: "#D6E8CC", fontFamily: CORPS, lineHeight: 1.6 }}>
+            {produit.description}
+          </p>
+        ) : (
+          <p className="text-[12px] text-center" style={{ color: texteDoux, fontFamily: CORPS }}>
+            {plusieurs ? "Fais glisser pour voir les autres photos." : "Tape sur la croix pour revenir."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ══════════ FAMILLE DE VIDÉOS ══════════
 // Une galerie, pas un rayon : aucun prix, aucun panier. Un appui ouvre la
 // vidéo en plein écran, exactement comme depuis une fiche produit.
@@ -672,7 +822,7 @@ export default function Boutique() {
   const [produit, setProduit] = useState(null);
   const [panier, setPanier] = useState([]);
   const [panierOuvert, setPanierOuvert] = useState(false);
-  const [zoom, setZoom] = useState(null);
+  const [vue, setVue] = useState(null);   // { produit, depart } : la visionneuse
   const [video, setVideo] = useState(null);
 
   // L'intro ne se rejoue pas à chaque page, seulement à chaque visite. En mode
@@ -808,7 +958,7 @@ export default function Boutique() {
             famille && EST_VIDEOS(famille) ? (
               <EcranVideos famille={famille} onRetour={retour} onVideo={setVideo} />
             ) : produit ? (
-              <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onZoom={setZoom} onVideo={setVideo} />
+              <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onOuvrir={(p, n) => setVue({ produit: p, depart: n || 0 })} onVideo={setVideo} />
             ) : gamme ? (
               <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
             ) : famille ? (
@@ -941,22 +1091,14 @@ export default function Boutique() {
           </div>
         )}
 
-        {/* photo en grand */}
-        {zoom && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.95)" }} onClick={() => setZoom(null)}>
-            <img src={zoom.image} alt={zoom.nom} className="max-w-full max-h-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
-            <button
-              onClick={() => setZoom(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: "#1A1A1ACC", border: `1px solid ${bordure}` }}
-              aria-label="Fermer la photo"
-            >
-              <X size={18} color={texte} />
-            </button>
-            <p className="absolute bottom-5 left-0 right-0 text-center text-[12px] px-6" style={{ color: texteDoux, fontFamily: CORPS }}>
-              {zoom.nom} — tape n'importe où pour fermer
-            </p>
-          </div>
+        {/* photos, descriptif et vidéo du produit */}
+        {vue && famille && (
+          <Visionneuse
+            produit={vue.produit}
+            famille={famille}
+            depart={vue.depart}
+            onFermer={() => setVue(null)}
+          />
         )}
       </div>
     </div>
