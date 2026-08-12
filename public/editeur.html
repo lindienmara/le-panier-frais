@@ -154,6 +154,12 @@
     font-family: var(--mono); font-size: .72rem; line-height: 1.55; white-space: pre; overflow: auto;
   }
 
+  input[type="range"] { width: 100%; accent-color: var(--jaune); height: 26px; }
+  #rec-cadre { border-radius: 12px; overflow: hidden; border: 1px solid var(--ligne); background: #000; margin: 12px 0; }
+  #rec-toile { display: block; width: 100%; height: auto; }
+  .rec-aide { font-size: .84rem; color: var(--doux); }
+  .rec-aide b { color: var(--texte); }
+
   .toast {
     position: fixed; left: 50%; transform: translateX(-50%); bottom: 82px; z-index: 60;
     background: var(--vert); color: #06120A; font-weight: 700; font-size: .88rem;
@@ -192,7 +198,14 @@
       <label><span class="lab">Bandeau tout en haut</span><input type="text" data-b="bandeau" /></label>
       <div class="duo">
         <label><span class="lab">Emoji du logo</span><input type="text" data-b="emoji" maxlength="4" /></label>
-        <label><span class="lab">Ou fichier logo</span><input type="text" data-b="logo" placeholder="/logo.jpg" /></label>
+        <label><span class="lab">Ou fichier logo</span><input type="text" data-b="logo" placeholder="/produits/logo.jpg" /></label>
+        </div>
+        <div class="media">
+          <p>Le logo s'affiche dans un <b>carré arrondi</b>. Choisis une image : tu la cadreras avant de valider, pour qu'aucune tête ne soit coupée.</p>
+          <input type="file" accept="image/*" id="photo-logo" />
+          <div class="resultat" id="res-logo"></div>
+        </div>
+        <div class="duo" style="display:none">
       </div>
       <label><span class="lab">Image de fond de la boutique (facultatif)</span><input type="text" data-b="fondImage" placeholder="/produits/fond.jpg" /></label>
       <div class="media">
@@ -276,6 +289,25 @@
       <button class="btn discret" id="fermer">Fermer</button>
     </div>
     <textarea id="code" readonly spellcheck="false"></textarea>
+  </div>
+</div>
+
+
+<div class="sortie" id="recadrage">
+  <div class="panneau">
+    <h2 id="rec-titre">Ajuster l'image</h2>
+    <p class="rec-aide" id="rec-info"></p>
+    <div id="rec-cadre"><canvas id="rec-toile"></canvas></div>
+    <label><span class="lab">Zoom</span><input type="range" id="rec-zoom" min="100" max="300" value="100" /></label>
+    <div class="duo">
+      <label><span class="lab">Déplacer à gauche / à droite</span><input type="range" id="rec-x" min="0" max="100" value="50" /></label>
+      <label><span class="lab">Déplacer en haut / en bas</span><input type="range" id="rec-y" min="0" max="100" value="50" /></label>
+    </div>
+    <div class="rangee" style="margin-top:4px">
+      <button class="btn principal" id="rec-valider">Valider cette image</button>
+      <button class="btn" id="rec-centrer">Recentrer</button>
+      <button class="btn" id="rec-annuler">Annuler</button>
+    </div>
   </div>
 </div>
 
@@ -595,39 +627,6 @@ function carteProduit(p, fi, gi, pi, total) {
     </div>`;
 }
 
-/* ───────────────── réduction des images ───────────────── */
-
-function preparerImage(fichier, max, nomVoulu, zone, apres) {
-  zone.style.color = "var(--doux)";
-  zone.textContent = "Traitement en cours...";
-  const lecteur = new FileReader();
-  lecteur.onload = () => {
-    const img = new Image();
-    img.onload = () => {
-      const ratio = Math.min(max / img.width, max / img.height, 1);
-      const l = Math.round(img.width * ratio), h = Math.round(img.height * ratio);
-      const toile = document.createElement("canvas");
-      toile.width = l; toile.height = h;
-      const ctx = toile.getContext("2d");
-      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, l, h);
-      ctx.drawImage(img, 0, 0, l, h);
-      toile.toBlob((blob) => {
-        if (!blob) { zone.style.color = "var(--rose)"; zone.textContent = "Échec du traitement."; return; }
-        const nom = nomVoulu + ".jpg";
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = nom;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
-        apres(nom, `${l}×${h} px, ${Math.round(blob.size / 1024)} Ko`);
-      }, "image/jpeg", 0.82);
-    };
-    img.onerror = () => { zone.style.color = "var(--rose)"; zone.textContent = "Image illisible. Essaie un JPG ou un PNG."; };
-    img.src = lecteur.result;
-  };
-  lecteur.onerror = () => { zone.style.color = "var(--rose)"; zone.textContent = "Lecture impossible."; };
-  lecteur.readAsDataURL(fichier);
-}
 
 /* ───────────────── génération du code ───────────────── */
 
@@ -685,6 +684,104 @@ ${couleurs}
 
 // Deux gammes peuvent porter le même nom : on garantit des identifiants
 // distincts, sinon la boutique confondrait leurs listes de produits.
+/* ═══════════ CADRAGE DES IMAGES ═══════════
+   Une seule fenêtre pour toutes les images : logo, bannière de famille, photo
+   de produit, fond de boutique. On voit exactement le cadre final avant de
+   valider, et on déplace l'image dedans pour ne rien couper d'important. */
+
+let CADRAGE = null;
+
+function ouvrirCadrage(fichier, options) {
+  const lecteur = new FileReader();
+  lecteur.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      CADRAGE = Object.assign({ img }, options);
+      document.getElementById("rec-titre").textContent = options.titre;
+      document.getElementById("rec-zoom").value = 100;
+      document.getElementById("rec-x").value = 50;
+      document.getElementById("rec-y").value = 50;
+      const libre = !options.ratio;
+      document.getElementById("rec-zoom").parentElement.style.display = libre ? "none" : "block";
+      document.getElementById("rec-zoom").parentElement.nextElementSibling.style.display = libre ? "none" : "grid";
+      document.getElementById("recadrage").classList.add("ouvert");
+      dessinerCadrage();
+    };
+    img.onerror = () => alert("Image illisible. Essaie un fichier JPG ou PNG.");
+    img.src = lecteur.result;
+  };
+  lecteur.onerror = () => alert("Lecture du fichier impossible.");
+  lecteur.readAsDataURL(fichier);
+}
+
+// Dimensions du fichier produit : imposées par l'usage, sauf pour le fond.
+function tailleCible() {
+  const { img, ratio, max } = CADRAGE;
+  if (!ratio) {
+    const k = Math.min(max / img.width, max / img.height, 1);
+    return { l: Math.round(img.width * k), h: Math.round(img.height * k) };
+  }
+  return ratio >= 1
+    ? { l: max, h: Math.round(max / ratio) }
+    : { l: Math.round(max * ratio), h: max };
+}
+
+// Portion de l'image d'origine qui sera conservée, selon zoom et position.
+function zoneSource() {
+  const { img, ratio } = CADRAGE;
+  if (!ratio) return { sx: 0, sy: 0, sl: img.width, sh: img.height };
+  let sl = img.width, sh = sl / ratio;
+  if (sh > img.height) { sh = img.height; sl = sh * ratio; }
+  const zoom = Number(document.getElementById("rec-zoom").value) / 100;
+  sl /= zoom; sh /= zoom;
+  const px = Number(document.getElementById("rec-x").value) / 100;
+  const py = Number(document.getElementById("rec-y").value) / 100;
+  return { sx: (img.width - sl) * px, sy: (img.height - sh) * py, sl, sh };
+}
+
+function dessinerCadrage() {
+  if (!CADRAGE) return;
+  const { l, h } = tailleCible();
+  const toile = document.getElementById("rec-toile");
+  toile.width = l; toile.height = h;
+  const ctx = toile.getContext("2d");
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, l, h);
+  const { sx, sy, sl, sh } = zoneSource();
+  ctx.drawImage(CADRAGE.img, sx, sy, sl, sh, 0, 0, l, h);
+  document.getElementById("rec-info").innerHTML = CADRAGE.ratio
+    ? `Voilà exactement ce qui sera visible. Cadre final : <b>${l} × ${h} px</b>. Déplace et zoome pour ne rien couper.`
+    : `Image réduite à <b>${l} × ${h} px</b>. Elle habillera tout le fond de la boutique.`;
+}
+
+function validerCadrage() {
+  if (!CADRAGE) return;
+  const toile = document.getElementById("rec-toile");
+  const { nom, apres } = CADRAGE;
+  toile.toBlob((blob) => {
+    if (!blob) { alert("Le traitement de l'image a échoué."); return; }
+    const fichier = nom + ".jpg";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fichier;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    apres(fichier, `${toile.width}×${toile.height} px, ${Math.round(blob.size / 1024)} Ko`);
+    fermerCadrage();
+  }, "image/jpeg", 0.85);
+}
+
+function fermerCadrage() {
+  CADRAGE = null;
+  document.getElementById("recadrage").classList.remove("ouvert");
+}
+
+// Proportions imposées par la boutique, pour que l'aperçu soit fidèle.
+const CADRE_LOGO = { ratio: 1, max: 400 };
+const CADRE_FAMILLE = { ratio: 760 / 340, max: 1000 };
+const CADRE_PRODUIT = { ratio: 1, max: 700 };
+const CADRE_FOND = { ratio: 0, max: 1400 };
+
 function idsUniques(noms) {
   const vus = new Map();
   return noms.map((n) => {
@@ -893,40 +990,65 @@ document.addEventListener("change", (e) => {
     t.value = "";
     return;
   }
+  if (t.id === "photo-logo" && t.files && t.files[0]) {
+    ouvrirCadrage(t.files[0], Object.assign({}, CADRE_LOGO, {
+      titre: "Cadrer le logo",
+      nom: "logo",
+      apres: (fichier, info) => {
+        etat.boutique.logo = "/produits/" + fichier;
+        sauver(); dessinerApparence();
+        const z = document.getElementById("res-logo");
+        if (z) { z.style.color = "var(--vert)"; z.textContent = fichier + " — " + info + ". Dépose-le dans public/produits sur GitHub."; }
+        toast("Logo prêt");
+      },
+    }));
+    t.value = "";
+    return;
+  }
   if (t.id === "photo-fond" && t.files && t.files[0]) {
-    preparerImage(t.files[0], 1400, "fond", document.getElementById("res-fond"), (nom, info) => {
+    ouvrirCadrage(t.files[0], Object.assign({}, CADRE_FOND, {
+      titre: "Image de fond de la boutique",
+      nom: "fond",
+      apres: (nom, info) => {
       etat.boutique.fondImage = "/produits/" + nom;
       sauver(); dessinerApparence();
       const z = document.getElementById("res-fond");
       if (z) { z.style.color = "var(--vert)"; z.textContent = nom + " — " + info + ". Dépose-le dans public/produits sur GitHub."; }
       toast("Image de fond prête");
-    });
+      },
+    }));
     return;
   }
   if (t.dataset.photoFam !== undefined && t.files && t.files[0]) {
     const fi = +t.dataset.photoFam;
-    const zone = document.querySelector(`[data-res-fam="${fi}"]`);
-    preparerImage(t.files[0], 1000, simplifier(etat.familles[fi].nom), zone, (nom, info) => {
+    ouvrirCadrage(t.files[0], Object.assign({}, CADRE_FAMILLE, {
+      titre: "Cadrer la bannière de « " + etat.familles[fi].nom + " »",
+      nom: simplifier(etat.familles[fi].nom),
+      apres: (nom, info) => {
       etat.familles[fi].image = "/produits/" + nom;
       etat.familles[fi].__ouvert = true;
       sauver(); dessinerCatalogue();
       const z = document.querySelector(`[data-res-fam="${fi}"]`);
       if (z) { z.style.color = "var(--vert)"; z.textContent = `${nom} — ${info}. Dépose-le dans public/produits sur GitHub.`; }
       toast("Photo prête");
-    });
+      },
+    }));
   }
   if (t.dataset.photoP !== undefined && t.files && t.files[0]) {
     const cle = t.dataset.photoP;
     const { liste, pi, fi } = trouverProduit(cle);
-    const zone = document.querySelector(`[data-res-p="${cle}"]`);
-    preparerImage(t.files[0], 700, simplifier(liste[pi].nom), zone, (nom, info) => {
+    ouvrirCadrage(t.files[0], Object.assign({}, CADRE_PRODUIT, {
+      titre: "Cadrer la photo de « " + liste[pi].nom + " »",
+      nom: simplifier(liste[pi].nom),
+      apres: (nom, info) => {
       liste[pi].image = "/produits/" + nom;
       etat.familles[fi].__ouvert = true;
       sauver(); dessinerCatalogue();
       const z = document.querySelector(`[data-res-p="${cle}"]`);
       if (z) { z.style.color = "var(--vert)"; z.textContent = `${nom} — ${info}. Dépose-le dans public/produits sur GitHub.`; }
       toast("Photo prête");
-    });
+      },
+    }));
   }
 });
 
@@ -935,6 +1057,22 @@ document.addEventListener("toggle", (e) => {
   if (d.tagName !== "DETAILS") return;
   if (d.dataset.f !== undefined) etat.familles[+d.dataset.f].__ouvert = d.open;
 }, true);
+
+document.addEventListener("input", (e) => {
+  if (["rec-zoom", "rec-x", "rec-y"].includes(e.target.id)) dessinerCadrage();
+});
+
+document.getElementById("rec-valider").addEventListener("click", validerCadrage);
+document.getElementById("rec-annuler").addEventListener("click", fermerCadrage);
+document.getElementById("rec-centrer").addEventListener("click", () => {
+  document.getElementById("rec-zoom").value = 100;
+  document.getElementById("rec-x").value = 50;
+  document.getElementById("rec-y").value = 50;
+  dessinerCadrage();
+});
+document.getElementById("recadrage").addEventListener("click", (e) => {
+  if (e.target.id === "recadrage") fermerCadrage();
+});
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button");

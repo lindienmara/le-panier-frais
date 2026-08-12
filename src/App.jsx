@@ -44,6 +44,13 @@ const { fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, c
 // est ajouté par-dessus pour que les textes restent lisibles, et la colonne
 // centrale devient légèrement transparente pour laisser voir l'image.
 const FOND_IMAGE = (BOUTIQUE.fondImage || "").trim();
+// Quand une image de fond est posée, la colonne et les espaces deviennent
+// transparents : seuls les blocs de contenu gardent un fond, légèrement
+// translucide, pour que l'image se voie partout entre les éléments.
+const COLONNE = FOND_IMAGE ? "transparent" : COULEURS.fond;
+const CARTE = FOND_IMAGE ? COULEURS.fondCarte + "D9" : COULEURS.fondCarte;
+const VOILE = (couleur, alpha) => (FOND_IMAGE ? couleur + alpha : couleur);
+
 const FOND_PAGE = FOND_IMAGE
   ? {
       backgroundImage: `linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.78)), url("${FOND_IMAGE}")`,
@@ -139,7 +146,7 @@ function EcranAccueil({ onFamille, onProduit }) {
         <div className="mx-3 mt-3">
           <div
             className="rounded-2xl px-4 py-3 flex items-center gap-3"
-            style={{ background: "#0E0E0E", border: `1px solid ${bordure}` }}
+            style={{ background: VOILE("#0E0E0E", "D9"), border: `1px solid ${bordure}` }}
           >
             <Star size={18} color={jaune} />
             <p className="flex-1 text-center" style={{ fontFamily: TITRE, fontSize: 15, color: texte, letterSpacing: "1px" }}>
@@ -154,7 +161,7 @@ function EcranAccueil({ onFamille, onProduit }) {
                 key={p.ref}
                 onClick={() => onProduit(p.famille, p.gamme, p)}
                 className="flex-shrink-0 rounded-xl px-3 py-2 text-left active:scale-95 transition-transform"
-                style={{ background: fondCarte, border: `1px solid ${bordure}`, minWidth: 148 }}
+                style={{ background: CARTE, border: `1px solid ${bordure}`, minWidth: 148 }}
               >
                 <p className="text-[12px] font-bold truncate" style={{ color: texte, fontFamily: CORPS }}>{p.nom}</p>
                 <Prix valeur={p.prix} taille={15} />
@@ -269,7 +276,7 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
           value={gammeFiltre}
           onChange={(e) => setGammeFiltre(e.target.value)}
           className="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none appearance-none"
-          style={{ background: "#1C1C1C", border: `1px solid ${bordure}`, color: texte, fontFamily: CORPS }}
+          style={{ background: VOILE("#1C1C1C", "D9"), border: `1px solid ${bordure}`, color: texte, fontFamily: CORPS }}
         >
           <option value="toutes">🧑‍🌾 — Toutes les gammes</option>
           {famille.gammes.map((g) => (
@@ -284,7 +291,7 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
             key={p.ref}
             onClick={() => onProduit(famille, p.gamme, p)}
             className="relative rounded-xl overflow-hidden text-left active:scale-[0.97] transition-transform"
-            style={{ background: fondCarte, border: `2px solid ${violet}` }}
+            style={{ background: CARTE, border: `2px solid ${violet}` }}
           >
             <div className="relative">
               <img
@@ -345,7 +352,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVi
           <button
             onClick={() => onVideo(produit)}
             className="w-full mt-3 py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
-            style={{ background: fondCarte, border: `2px solid ${cyan}`, boxShadow: `0 0 16px ${cyan}33` }}
+            style={{ background: CARTE, border: `2px solid ${cyan}`, boxShadow: `0 0 16px ${cyan}33` }}
           >
             <PlayCircle size={20} color={cyan} />
             <span style={{ fontFamily: TITRE, fontSize: 16, color: cyan, letterSpacing: ".5px" }}>
@@ -366,7 +373,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVi
           {produit.description}
         </p>
 
-        <div className="mt-5 rounded-2xl p-4" style={{ background: fondCarte, border: `1px solid ${bordure}` }}>
+        <div className="mt-5 rounded-2xl p-4" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
           <div className="flex items-end justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-wider" style={{ color: texteDoux, fontFamily: CORPS }}>Prix</p>
@@ -375,7 +382,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVi
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-wider mb-1 text-right" style={{ color: texteDoux, fontFamily: CORPS }}>Quantité</p>
-              <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: fond, border: `1px solid ${bordure}` }}>
+              <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: VOILE(fond, "CC"), border: `1px solid ${bordure}` }}>
                 <button onClick={() => setQte((q) => Math.max(1, q - 1))} className="w-8 h-8 rounded-lg flex items-center justify-center active:scale-90" aria-label="Moins">
                   <Minus size={14} color={texte} />
                 </button>
@@ -397,7 +404,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onZoom, onVi
             </button>
           ) : (
             <p className="w-full mt-4 py-3.5 rounded-xl text-center text-[13px] font-bold"
-              style={{ background: "#262626", color: texteDoux, border: `1px solid ${bordure}` }}>
+              style={{ background: VOILE("#262626", "D9"), color: texteDoux, border: `1px solid ${bordure}` }}>
               Bientôt de retour
             </p>
           )}
@@ -413,7 +420,7 @@ function EcranInfo() {
       <BarreSection titre="INFOS PRATIQUES" />
       <div className="px-3 mt-4 flex flex-col gap-3">
         {BOUTIQUE.info.map((bloc) => (
-          <div key={bloc.titre} className="rounded-2xl p-4" style={{ background: fondCarte, border: `1px solid ${bordure}` }}>
+          <div key={bloc.titre} className="rounded-2xl p-4" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
             <p style={{ fontFamily: TITRE, fontSize: 17, color: jaune }}>{bloc.titre.toUpperCase()}</p>
             <p className="text-[14px] mt-1" style={{ color: "#D6E8CC", fontFamily: CORPS }}>{bloc.texte}</p>
           </div>
@@ -459,7 +466,7 @@ function EcranAvis() {
     <>
       <BarreSection titre="AVIS" />
       <div className="px-3 mt-4">
-        <div className="rounded-2xl p-6 text-center" style={{ background: fondCarte, border: `1px solid ${bordure}` }}>
+        <div className="rounded-2xl p-6 text-center" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
           <Star size={28} color={jaune} className="mx-auto" />
           <p className="mt-3" style={{ fontFamily: TITRE, fontSize: 19, color: texte }}>PAS ENCORE D'AVIS</p>
           <p className="text-[13px] mt-2" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.6 }}>
@@ -537,7 +544,7 @@ export default function Boutique() {
 
       <div
         className="relative w-full max-w-[560px] mx-auto min-h-screen"
-        style={{ background: FOND_IMAGE ? fond + "D9" : fond }}
+        style={{ background: COLONNE }}
       >
 
         {/* bandeau et entête */}
@@ -556,7 +563,7 @@ export default function Boutique() {
           </div>
           <div
             className="flex items-center justify-between px-3 py-2"
-            style={{ background: "#0B0B0BEE", backdropFilter: "blur(8px)", borderBottom: `1px solid ${bordure}` }}
+            style={{ background: FOND_IMAGE ? "#0B0B0BB3" : "#0B0B0BEE", backdropFilter: "blur(8px)", borderBottom: `1px solid ${bordure}` }}
           >
             <span className="w-11" />
             <button onClick={accueil} className="flex flex-col items-center active:scale-95 transition-transform">
@@ -582,7 +589,7 @@ export default function Boutique() {
             <button
               onClick={() => setPanierOuvert(true)}
               className="relative w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: fondCarte, border: `1px solid ${bordure}` }}
+              style={{ background: CARTE, border: `1px solid ${bordure}` }}
               aria-label="Ouvrir le panier"
             >
               <ShoppingCart size={19} color={texte} />
@@ -618,7 +625,7 @@ export default function Boutique() {
         {/* barre de navigation du bas */}
         <div
           className="fixed bottom-0 left-0 right-0 z-30 flex justify-center gap-2 px-3 py-2.5"
-          style={{ background: "#0B0B0BF2", backdropFilter: "blur(10px)", borderTop: `1px solid ${bordure}` }}
+          style={{ background: FOND_IMAGE ? "#0B0B0BB3" : "#0B0B0BF2", backdropFilter: "blur(10px)", borderTop: `1px solid ${bordure}` }}
         >
           <div className="w-full max-w-[560px] flex justify-around gap-2">
             {onglets.map(({ id, nom, Icone }) => {
@@ -629,7 +636,7 @@ export default function Boutique() {
                   onClick={() => (id === "accueil" ? accueil() : setOnglet(id))}
                   className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-2xl active:scale-95 transition-transform"
                   style={{
-                    background: actif ? "#1A0A14" : "transparent",
+                    background: actif ? VOILE("#1A0A14", "D9") : "transparent",
                     border: `2px solid ${actif ? rose : "#3A2130"}`,
                     boxShadow: actif ? `0 0 16px ${rose}55` : "none",
                   }}
@@ -654,7 +661,7 @@ export default function Boutique() {
             <div
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-[560px] rounded-t-3xl p-5 max-h-[92vh] overflow-y-auto"
-              style={{ background: "#101010", border: `1px solid ${bordure}` }}
+              style={{ background: VOILE("#101010", "F2"), border: `1px solid ${bordure}` }}
             >
               <div className="flex items-center justify-between mb-2">
                 <p style={{ fontFamily: TITRE, fontSize: 22, color: texte }}>MON PANIER</p>
@@ -677,7 +684,7 @@ export default function Boutique() {
                         <p className="text-[11px]" style={{ color: texteDoux, fontFamily: CORPS }}>{i.unite} · réf. {i.ref}</p>
                         <div className="mt-0.5"><Prix valeur={i.prix * i.qty} taille={16} /></div>
                       </div>
-                      <div className="flex items-center gap-1 rounded-xl p-1 flex-shrink-0" style={{ background: fond, border: `1px solid ${bordure}` }}>
+                      <div className="flex items-center gap-1 rounded-xl p-1 flex-shrink-0" style={{ background: VOILE(fond, "CC"), border: `1px solid ${bordure}` }}>
                         <button onClick={() => changerQte(i.ref, -1)} className="w-7 h-7 rounded-lg flex items-center justify-center active:scale-90" aria-label="Retirer">
                           <Minus size={13} color={texte} />
                         </button>
