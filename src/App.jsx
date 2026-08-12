@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Search, ShoppingCart, Plus, Minus, X,
   Home, Info, Link2, Star, MessageCircle, Maximize2, PlayCircle,
@@ -33,7 +33,12 @@ const BOUTIQUE = APERCU ? { ...BOUTIQUE_PUBLIEE, ...APERCU.BOUTIQUE } : BOUTIQUE
 const COULEURS = APERCU ? { ...COULEURS_PUBLIEES, ...APERCU.COULEURS } : COULEURS_PUBLIEES;
 const FAMILLES = APERCU ? APERCU.FAMILLES : FAMILLES_PUBLIEES;
 
-const TOUS_PRODUITS = FAMILLES.flatMap((f) =>
+// Une famille peut être une galerie de vidéos au lieu d'un rayon de produits.
+// Elle se place où on veut dans la liste, et rien ne s'y achète : ni prix, ni
+// panier. C'est le seul champ qui distingue les deux.
+const EST_VIDEOS = (f) => f.type === "videos";
+
+const TOUS_PRODUITS = FAMILLES.filter((f) => !EST_VIDEOS(f)).flatMap((f) =>
   f.gammes.flatMap((g) => g.produits.map((p) => ({ ...p, famille: f, gamme: g })))
 );
 const SELECTION_CHEF = TOUS_PRODUITS.filter((p) => p.chef);
@@ -62,6 +67,35 @@ const FOND_PAGE = FOND_IMAGE
 const DEGRADE = `linear-gradient(90deg, ${rose}, ${violet})`;
 const TITRE = "'Anton', 'Arial Narrow', Impact, sans-serif";
 const CORPS = "'Inter', -apple-system, 'Segoe UI', sans-serif";
+
+// Ouverture facultative, jouée une fois par visite. Une vidéo si elle est
+// fournie, sinon un simple titre animé — qui ne coûte rien à charger.
+const INTRO = {
+  active: BOUTIQUE.introActive === true,
+  texte: (BOUTIQUE.introTexte || "").trim() || `BIENVENUE CHEZ ${BOUTIQUE.nom}`,
+  video: (BOUTIQUE.introVideo || "").trim(),
+  duree: Math.min(15, Math.max(1, Number(BOUTIQUE.introDuree) || 3)),
+};
+
+const ANIMATIONS = `
+@keyframes atelier-apparition {
+  from { opacity: 0; transform: scale(.86) translateY(14px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes atelier-lueur {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.35); }
+}
+@keyframes atelier-trait {
+  from { width: 0; opacity: 0; }
+  to   { width: 62%; opacity: 1; }
+}
+@keyframes atelier-sortie {
+  to { opacity: 0; visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atelier-anime { animation: none !important; }
+}`;
 
 document.title = (APERCU ? "Aperçu — " : "") + BOUTIQUE.nom;
 
@@ -181,6 +215,17 @@ function EcranAccueil({ onFamille, onProduit }) {
           >
             <img src={visuelFamille(f)} alt={f.nom} className="w-full aspect-[760/340] object-cover block" />
             <span className="absolute top-2 right-2 text-[22px]">{f.emoji}</span>
+            {EST_VIDEOS(f) && (
+              <span
+                className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg"
+                style={{ background: "#000000A8", border: `1px solid ${cyan}` }}
+              >
+                <PlayCircle size={13} color={cyan} />
+                <span style={{ fontFamily: CORPS, fontSize: 9.5, fontWeight: 800, color: cyan, letterSpacing: ".1em" }}>
+                  VIDÉOS
+                </span>
+              </span>
+            )}
             {/* Le titre est écrit ici, pas dans l'image : il reste lisible même
                 si la photo change. */}
             <span
@@ -489,6 +534,137 @@ function EcranAvis() {
 
 /* ─────────────────────────── application ─────────────────────────── */
 
+// ══════════ OUVERTURE DE LA BOUTIQUE ══════════
+// Jouée une fois par visite. La vidéo est muette : tous les navigateurs
+// refusent de démarrer un son tout seul, sans quoi rien ne se lancerait.
+function Intro({ onFini }) {
+  const [sort, setSort] = useState(false);
+  const dejaFait = useRef(false);
+
+  const fermer = () => {
+    if (dejaFait.current) return;
+    dejaFait.current = true;
+    setSort(true);
+    setTimeout(onFini, 420);
+  };
+
+  // Filet de sécurité : même si la vidéo ne démarre pas, l'intro s'efface.
+  useEffect(() => {
+    const t = setTimeout(fermer, INTRO.duree * 1000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center px-6 cursor-pointer"
+      style={{ background: "#050505", animation: sort ? "atelier-sortie .4s ease forwards" : "none" }}
+      onClick={fermer}
+    >
+      {INTRO.video ? (
+        <video
+          src={INTRO.video}
+          autoPlay
+          muted
+          playsInline
+          onEnded={fermer}
+          onError={fermer}
+          className="max-w-full max-h-[76vh] rounded-2xl"
+          style={{ border: `2px solid ${rose}`, boxShadow: `0 0 40px ${rose}55` }}
+        />
+      ) : (
+        <>
+          <p
+            className="atelier-anime text-center"
+            style={{
+              fontFamily: TITRE, fontSize: "clamp(30px, 11vw, 62px)", lineHeight: 1.02,
+              backgroundImage: DEGRADE, WebkitBackgroundClip: "text", backgroundClip: "text",
+              color: "transparent",
+              animation: "atelier-apparition .8s cubic-bezier(.2,.9,.2,1) both, atelier-lueur 2.4s ease-in-out .8s infinite",
+            }}
+          >
+            {INTRO.texte}
+          </p>
+          <span
+            className="atelier-anime block mt-5 rounded-full"
+            style={{ height: 4, backgroundImage: DEGRADE, animation: "atelier-trait 1.1s ease .35s both" }}
+          />
+        </>
+      )}
+      <p
+        className="absolute bottom-7 text-[11px] uppercase tracking-[.2em]"
+        style={{ color: texteDoux, fontFamily: CORPS }}
+      >
+        Tape pour entrer
+      </p>
+    </div>
+  );
+}
+
+// ══════════ FAMILLE DE VIDÉOS ══════════
+// Une galerie, pas un rayon : aucun prix, aucun panier. Un appui ouvre la
+// vidéo en plein écran, exactement comme depuis une fiche produit.
+function EcranVideos({ famille, onRetour, onVideo }) {
+  return (
+    <>
+      <BarreSection titre={`${famille.emoji} ${famille.nom}`} onRetour={onRetour} />
+      <div className="flex flex-col gap-5 px-3 mt-4">
+        {famille.gammes.map((g) => (
+          <div key={g.id}>
+            {famille.gammes.length > 1 && (
+              <p className="mb-2 px-1" style={{ fontFamily: TITRE, fontSize: 19, color: jaune, letterSpacing: ".5px" }}>
+                {g.nom} {g.etiquette && <span style={{ fontSize: 12, color: cyan }}>{g.etiquette}</span>}
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              {g.produits.map((p) => {
+                const affiche = visuelProduit(p, famille.couleurs, famille.glyphe);
+                const jouable = !!(p.video || "").trim();
+                return (
+                  <button
+                    key={p.ref}
+                    onClick={() => jouable && onVideo(p)}
+                    className="relative rounded-2xl overflow-hidden text-left active:scale-[0.97] transition-transform"
+                    style={{
+                      border: `2px solid ${jouable ? famille.couleurs[0] : bordure}`,
+                      boxShadow: jouable ? `0 0 18px ${famille.couleurs[0]}33` : "none",
+                      opacity: jouable ? 1 : 0.55,
+                    }}
+                  >
+                    <img src={affiche} alt={p.nom} className="w-full aspect-square object-cover block" />
+                    {jouable && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span
+                          className="w-14 h-14 rounded-full flex items-center justify-center"
+                          style={{ background: "#000000A8", border: `2px solid ${cyan}`, boxShadow: `0 0 18px ${cyan}66` }}
+                        >
+                          <PlayCircle size={28} color={cyan} />
+                        </span>
+                      </span>
+                    )}
+                    <span
+                      className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5 pt-8"
+                      style={{ backgroundImage: "linear-gradient(0deg, #000000C8 20%, transparent 100%)" }}
+                    >
+                      <span className="block text-[12px] font-bold leading-tight" style={{ color: texte, fontFamily: CORPS }}>
+                        {p.nom}
+                      </span>
+                      {!jouable && (
+                        <span className="block text-[10px] mt-0.5" style={{ color: texteDoux, fontFamily: CORPS }}>
+                          vidéo à venir
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function Boutique() {
   const [onglet, setOnglet] = useState("accueil");
   const [famille, setFamille] = useState(null);
@@ -498,6 +674,23 @@ export default function Boutique() {
   const [panierOuvert, setPanierOuvert] = useState(false);
   const [zoom, setZoom] = useState(null);
   const [video, setVideo] = useState(null);
+
+  // L'intro ne se rejoue pas à chaque page, seulement à chaque visite. En mode
+  // aperçu elle se rejoue toujours, pour pouvoir la régler tranquillement.
+  const [intro, setIntro] = useState(() => {
+    if (!INTRO.active) return false;
+    if (APERCU) return true;
+    try {
+      return !sessionStorage.getItem("intro-vue");
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const finirIntro = () => {
+    setIntro(false);
+    try { sessionStorage.setItem("intro-vue", "1"); } catch (e) {}
+  };
 
   const nbArticles = panier.reduce((s, i) => s + i.qty, 0);
 
@@ -541,6 +734,8 @@ export default function Boutique() {
   return (
     <div className="min-h-screen w-full" style={FOND_PAGE}>
       <style>{FONTS}</style>
+      <style>{ANIMATIONS}</style>
+      {intro && <Intro onFini={finirIntro} />}
 
       <div
         className="relative w-full max-w-[560px] mx-auto min-h-screen"
@@ -610,7 +805,9 @@ export default function Boutique() {
           {onglet === "liens" && <EcranLiens />}
           {onglet === "avis" && <EcranAvis />}
           {onglet === "accueil" && (
-            produit ? (
+            famille && EST_VIDEOS(famille) ? (
+              <EcranVideos famille={famille} onRetour={retour} onVideo={setVideo} />
+            ) : produit ? (
               <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onZoom={setZoom} onVideo={setVideo} />
             ) : gamme ? (
               <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
