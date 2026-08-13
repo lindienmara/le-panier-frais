@@ -77,7 +77,7 @@ const CORPS = "'Inter', -apple-system, 'Segoe UI', sans-serif";
 // fournie, sinon un simple titre animé — qui ne coûte rien à charger.
 const INTRO = {
   active: BOUTIQUE.introActive === true,
-  texte: (BOUTIQUE.introTexte || "").trim() || `BIENVENUE CHEZ ${BOUTIQUE.nom}`,
+  texte: (BOUTIQUE.introTexte || "").trim() || `BIENVENUE — ${(BOUTIQUE.nom || "").toUpperCase()}`,
   video: (BOUTIQUE.introVideo || "").trim(),
   duree: Math.min(15, Math.max(1, Number(BOUTIQUE.introDuree) || 3)),
 };
