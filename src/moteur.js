@@ -10,7 +10,7 @@
 
 export const MOTEUR = {
   modele: "vitrine-3-niveaux",
-  version: "3.0",
+  version: "3.9",
   // Ce que sait faire cette version, pour information.
   capacites: [
     "familles > gammes > produits",
@@ -20,5 +20,14 @@ export const MOTEUR = {
     "famille galerie de videos",
     "ouverture animee au demarrage",
     "image de fond et espaces transparents",
+    "photo entiere ou recadree, au choix",
+    "un produit en vedette sur l accueil",
+    "commande sur WhatsApp, Telegram, Signal ou Snapchat",
+    "photos en portrait, paysage ou forme d origine",
+    "photos enregistrees entieres, cadrage modifiable a tout moment",
+    "presentation en familles ou en liste, au choix",
+    "les deux types de boutique sont separes : corriger l un ne touche pas l autre",
+    "choisir une categorie ne montre plus que cette categorie",
+    "une famille sans article le dit, au lieu d ouvrir un ecran vide",
   ],
 };

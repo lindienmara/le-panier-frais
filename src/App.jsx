@@ -1,265 +1,67 @@
+// LE MOTEUR — ASSEMBLAGE
+// ----------------------
+// Ce fichier ne contient plus que les ecrans communs aux deux types (gammes,
+// produits, fiche, infos, liens, avis, intro, visionneuse, videos) et
+// l'aiguillage : selon le type de la boutique, l'accueil est celui du
+// type 1 ou celui du type 2.
+//
+// Trois fichiers, trois roles :
+//   commun.jsx        ce que TOUTES les boutiques partagent
+//   type-familles.jsx le type 1, et lui seul
+//   type-liste.jsx    le type 2, et lui seul
+
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Search, ShoppingCart, Plus, Minus, X,
   Home, Info, Link2, Star, MessageCircle, Maximize2, PlayCircle,
 } from "lucide-react";
-import { BOUTIQUE as BOUTIQUE_PUBLIEE, COULEURS as COULEURS_PUBLIEES } from "./config.js";
-import { FAMILLES as FAMILLES_PUBLIEES } from "./catalogue.js";
 import { visuelFamille, visuelProduit } from "./visuels.js";
-
-const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap');`;
-
-// APERÇU — l'éditeur ouvre la boutique avec le brouillon dans l'adresse, après
-// le dièse : .../?apercu=1#<données>. La partie après le dièse ne quitte jamais
-// le navigateur, et ce mécanisme fonctionne même quand l'éditeur est hébergé
-// ailleurs que la boutique. Sans ce paramètre, rien ne change.
-function brouillon() {
-  try {
-    if (new URLSearchParams(location.search).get("apercu") !== "1") return null;
-    const charge = location.hash.replace(/^#/, "");
-    if (!charge) return null;
-    const binaire = atob(charge);
-    const octets = Uint8Array.from(binaire, (c) => c.charCodeAt(0));
-    const d = JSON.parse(new TextDecoder().decode(octets));
-    if (!d || !d.BOUTIQUE || !d.COULEURS || !Array.isArray(d.FAMILLES)) return null;
-    return d;
-  } catch (e) {
-    return null;
-  }
-}
-
-const APERCU = brouillon();
-const BOUTIQUE = APERCU ? { ...BOUTIQUE_PUBLIEE, ...APERCU.BOUTIQUE } : BOUTIQUE_PUBLIEE;
-const COULEURS = APERCU ? { ...COULEURS_PUBLIEES, ...APERCU.COULEURS } : COULEURS_PUBLIEES;
-const FAMILLES = APERCU ? APERCU.FAMILLES : FAMILLES_PUBLIEES;
-
-// Une famille peut être une galerie de vidéos au lieu d'un rayon de produits.
-// Elle se place où on veut dans la liste, et rien ne s'y achète : ni prix, ni
-// panier. C'est le seul champ qui distingue les deux.
-const EST_VIDEOS = (f) => f.type === "videos";
-
-// Un produit peut porter plusieurs photos. « images » est la liste complète,
-// « image » la première — gardée pour les catalogues écrits avant la galerie.
-const GALERIE = (p) =>
-  Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
-
-const TOUS_PRODUITS = FAMILLES.filter((f) => !EST_VIDEOS(f)).flatMap((f) =>
-  f.gammes.flatMap((g) => g.produits.map((p) => ({ ...p, famille: f, gamme: g })))
-);
-const SELECTION_CHEF = TOUS_PRODUITS.filter((p) => p.chef);
-
-const { fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, cyan } = COULEURS;
-
-// Image de fond facultative, posée derrière toute la boutique. Un voile sombre
-// est ajouté par-dessus pour que les textes restent lisibles, et la colonne
-// centrale devient légèrement transparente pour laisser voir l'image.
-const FOND_IMAGE = (BOUTIQUE.fondImage || "").trim();
-// Quand une image de fond est posée, la colonne et les espaces deviennent
-// transparents : seuls les blocs de contenu gardent un fond, légèrement
-// translucide, pour que l'image se voie partout entre les éléments.
-const COLONNE = FOND_IMAGE ? "transparent" : COULEURS.fond;
-const CARTE = FOND_IMAGE ? COULEURS.fondCarte + "D9" : COULEURS.fondCarte;
-const VOILE = (couleur, alpha) => (FOND_IMAGE ? couleur + alpha : couleur);
-
-const FOND_PAGE = FOND_IMAGE
-  ? {
-      backgroundImage: `linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.78)), url("${FOND_IMAGE}")`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundAttachment: "fixed",
-    }
-  : { background: `radial-gradient(circle at 50% 0%, ${COULEURS.halo || "#17240F"} 0%, #060505 62%)` };
-const DEGRADE = `linear-gradient(90deg, ${rose}, ${violet})`;
-const TITRE = "'Anton', 'Arial Narrow', Impact, sans-serif";
-const CORPS = "'Inter', -apple-system, 'Segoe UI', sans-serif";
-
-// Ouverture facultative, jouée une fois par visite. Une vidéo si elle est
-// fournie, sinon un simple titre animé — qui ne coûte rien à charger.
-const INTRO = {
-  active: BOUTIQUE.introActive === true,
-  texte: (BOUTIQUE.introTexte || "").trim() || `BIENVENUE — ${(BOUTIQUE.nom || "").toUpperCase()}`,
-  video: (BOUTIQUE.introVideo || "").trim(),
-  duree: Math.min(15, Math.max(1, Number(BOUTIQUE.introDuree) || 3)),
-};
-
-const ANIMATIONS = `
-@keyframes atelier-apparition {
-  from { opacity: 0; transform: scale(.86) translateY(14px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-@keyframes atelier-lueur {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.35); }
-}
-@keyframes atelier-trait {
-  from { width: 0; opacity: 0; }
-  to   { width: 62%; opacity: 1; }
-}
-@keyframes atelier-sortie {
-  to { opacity: 0; visibility: hidden; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .atelier-anime { animation: none !important; }
-}`;
-
-document.title = (APERCU ? "Aperçu — " : "") + BOUTIQUE.nom;
-
-const telegram = window.Telegram && window.Telegram.WebApp;
-if (telegram) {
-  telegram.ready();
-  telegram.expand();
-}
-
-const euros = (n) => n.toFixed(2).replace(".", ",") + " €";
-
-function cartTotal(items) {
-  return items.reduce((s, i) => s + i.prix * i.qty, 0);
-}
-
-function buildWhatsAppOrder(items) {
-  const lignes = items.map(
-    (i) => `• ${i.nom} — ${i.unite} (réf. ${i.ref}) x${i.qty} — ${euros(i.prix * i.qty)}`
-  );
-  const message = `${BOUTIQUE.accroche}\n\n${lignes.join("\n")}\n\nTotal : ${euros(cartTotal(items))}`;
-  return `https://wa.me/${BOUTIQUE.whatsapp}?text=${encodeURIComponent(message)}`;
-}
-
-/* ─────────────────────────── petits éléments ─────────────────────────── */
-
-function Etiquette({ children, couleur = vert }) {
+import {
+  FONTS, APERCU, BOUTIQUE, COULEURS, FAMILLES, EST_VIDEOS, GALERIE,
+  TOUS_PRODUITS, SELECTION_CHEF, VEDETTES, SECOURS, PRESENTATION, AJUSTEMENT,
+  PROPORTION_PHOTO, STYLE_PHOTO, FOND_IMAGE, COLONNE, CARTE, VOILE, FOND_PAGE,
+  DEGRADE, TITRE, CORPS, INTRO, ANIMATIONS, telegram, euros, MESSAGERIES,
+  MESSAGERIE, CONTACT, Photo, Video, Etiquette, Prix, BarreSection, Vedettes,
+  cartTotal, texteCommande, lienCommande, copierAvantDePartir,
+  fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, cyan,
+} from "./commun.jsx";
+import { EcranFamilles } from "./type-familles.jsx";
+import { EcranListe } from "./type-liste.jsx";
+/* Une famille sans aucune gamme ouvrait un ecran entierement vide : le titre,
+   puis rien. Vu du visiteur — et de qui tient la boutique — le bouton semble
+   simplement ne pas marcher, alors qu'il a parfaitement fonctionne. On ne
+   laisse plus jamais un ecran muet : il dit ce qu'il en est, et propose de
+   revenir. */
+function RayonVide({ famille, onRetour }) {
   return (
-    <span
-      className="inline-block px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded"
-      style={{ background: couleur, color: "#0B0B0B", fontFamily: CORPS }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Prix({ valeur, taille = 18 }) {
-  return (
-    <span
-      style={{
-        fontFamily: TITRE, fontSize: taille, letterSpacing: ".5px",
-        backgroundImage: `linear-gradient(90deg, ${jaune}, ${vert})`,
-        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-      }}
-    >
-      {euros(valeur)}
-    </span>
-  );
-}
-
-// Grande barre rose en haut de chaque écran : retour + nom de la section.
-function BarreSection({ titre, onRetour }) {
-  return (
-    <div
-      className="mx-3 mt-3 rounded-2xl px-3 py-3 flex items-center gap-2"
-      style={{ backgroundImage: DEGRADE, boxShadow: `0 6px 22px ${rose}44` }}
-    >
-      {onRetour ? (
-        <button onClick={onRetour} aria-label="Revenir en arrière" className="active:scale-90 transition-transform">
-          <ChevronLeft size={22} color="#fff" />
-        </button>
-      ) : (
-        <span className="w-[22px]" />
-      )}
-      <p className="flex-1 text-right pr-1" style={{ fontFamily: TITRE, fontSize: 17, color: "#fff", letterSpacing: ".5px" }}>
-        {titre}
+    <div className="mx-3 mt-6 rounded-2xl px-4 py-6 text-center"
+      style={{ background: CARTE, border: `1px solid ${bordure}` }}>
+      <p style={{ fontFamily: TITRE, fontSize: 19, color: texte, letterSpacing: ".5px" }}>
+        {famille.emoji} Bientôt garni
       </p>
+      <p className="mt-2" style={{ fontFamily: CORPS, fontSize: 13, color: texteDoux }}>
+        Cette famille n'a pas encore d'articles. Reviens la voir bientôt.
+      </p>
+      <button
+        onClick={onRetour}
+        className="mt-4 px-4 py-2.5 rounded-xl active:scale-95 transition-transform"
+        style={{ backgroundImage: DEGRADE, color: "#fff", fontFamily: CORPS, fontSize: 13, fontWeight: 700 }}
+      >
+        Revenir aux familles
+      </button>
     </div>
   );
 }
 
-/* ─────────────────────────── écrans ─────────────────────────── */
-
-function EcranAccueil({ onFamille, onProduit }) {
-  // Le bloc « mis en avant » disparaît complètement si son titre est vide dans
-  // config.js, ou si aucun produit n'est marqué en avant.
-  const montrerEnAvant = !!(BOUTIQUE.enAvant || "").trim() && SELECTION_CHEF.length > 0;
-
-  return (
-    <>
-      {montrerEnAvant && (
-        <div className="mx-3 mt-3">
-          <div
-            className="rounded-2xl px-4 py-3 flex items-center gap-3"
-            style={{ background: VOILE("#0E0E0E", "D9"), border: `1px solid ${bordure}` }}
-          >
-            <Star size={18} color={jaune} />
-            <p className="flex-1 text-center" style={{ fontFamily: TITRE, fontSize: 15, color: texte, letterSpacing: "1px" }}>
-              {BOUTIQUE.enAvant}
-            </p>
-            <span style={{ color: texteDoux, fontSize: 12 }}>▾</span>
-          </div>
-
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-            {SELECTION_CHEF.map((p) => (
-              <button
-                key={p.ref}
-                onClick={() => onProduit(p.famille, p.gamme, p)}
-                className="flex-shrink-0 rounded-xl px-3 py-2 text-left active:scale-95 transition-transform"
-                style={{ background: CARTE, border: `1px solid ${bordure}`, minWidth: 148 }}
-              >
-                <p className="text-[12px] font-bold truncate" style={{ color: texte, fontFamily: CORPS }}>{p.nom}</p>
-                <Prix valeur={p.prix} taille={15} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-4 px-3 mt-4">
-        {FAMILLES.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => onFamille(f)}
-            className="relative rounded-2xl overflow-hidden active:scale-[0.98] transition-transform"
-            style={{ border: `2px solid ${f.couleurs[0]}`, boxShadow: `0 0 24px ${f.couleurs[0]}33` }}
-          >
-            <img src={visuelFamille(f)} alt={f.nom} className="w-full aspect-[760/340] object-cover block" />
-            <span className="absolute top-2 right-2 text-[22px]">{f.emoji}</span>
-            {EST_VIDEOS(f) && (
-              <span
-                className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg"
-                style={{ background: "#000000A8", border: `1px solid ${cyan}` }}
-              >
-                <PlayCircle size={13} color={cyan} />
-                <span style={{ fontFamily: CORPS, fontSize: 9.5, fontWeight: 800, color: cyan, letterSpacing: ".1em" }}>
-                  VIDÉOS
-                </span>
-              </span>
-            )}
-            {/* Le titre est écrit ici, pas dans l'image : il reste lisible même
-                si la photo change. */}
-            <span
-              className="absolute inset-x-0 bottom-0 pb-4 pt-10 px-3 flex items-end justify-center"
-              style={{ backgroundImage: "linear-gradient(0deg, #000000B0 15%, transparent 100%)" }}
-            >
-              <span
-                style={{
-                  fontFamily: TITRE, color: jaune, letterSpacing: "1px", lineHeight: 1,
-                  fontSize: f.nom.length > 13 ? 26 : f.nom.length > 9 ? 32 : 38,
-                  WebkitTextStroke: "3px #160B22", paintOrder: "stroke",
-                }}
-              >
-                {f.nom}
-              </span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
-
 function EcranGammes({ famille, onGamme, onRetour }) {
+  // Une gamme sans le moindre produit est un cul-de-sac : on ne la propose pas.
+  const gammes = (famille.gammes || []).filter((g) => (g.produits || []).length > 0);
   return (
     <>
       <BarreSection titre={`${famille.emoji} ${famille.nom}`} onRetour={onRetour} />
+      {gammes.length === 0 && <RayonVide famille={famille} onRetour={onRetour} />}
       <div className="flex flex-col gap-3 px-3 mt-4">
-        {famille.gammes.map((g) => (
+        {gammes.map((g) => (
           <button
             key={g.id}
             onClick={() => onGamme(g)}
@@ -344,11 +146,13 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
             style={{ background: CARTE, border: `2px solid ${violet}` }}
           >
             <div className="relative">
-              <img
-                src={visuelProduit(p, famille.couleurs, famille.glyphe)}
+              <Photo
+                produit={p}
+                secours={SECOURS(p, famille)}
+                source={visuelProduit(p, famille.couleurs, famille.glyphe)}
                 alt={p.nom}
-                className="w-full aspect-square object-cover block"
-                style={{ opacity: p.dispo ? 1 : 0.4 }}
+                className="w-full block"
+                style={{ ...STYLE_PHOTO(p), opacity: p.dispo ? 1 : 0.4 }}
               />
               <span className="absolute top-1.5 right-1.5">
                 {p.dispo ? <Etiquette couleur={cyan}>{p.gamme.etiquette}</Etiquette> : <Etiquette couleur="#888">Épuisé</Etiquette>}
@@ -388,7 +192,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
           className="relative w-full rounded-2xl overflow-hidden block"
           style={{ border: `2px solid ${famille.couleurs[0]}`, boxShadow: `0 0 24px ${famille.couleurs[0]}33` }}
         >
-          <img src={image} alt={produit.nom} className="w-full aspect-square object-cover block" />
+          <Photo produit={produit} secours={SECOURS(produit, famille)} source={image} alt={produit.nom} className="w-full block" />
           <span
             className="absolute bottom-3 right-3 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold"
             style={{ background: "#000000AA", color: texte, border: `1px solid ${bordure}` }}
@@ -549,11 +353,12 @@ function EcranAvis() {
             Les avis affichés ici seront de vrais avis de clients. Rien n'est inventé.
           </p>
           <a
-            href={`https://wa.me/${BOUTIQUE.whatsapp}?text=${encodeURIComponent("Bonjour, je souhaite laisser un avis sur ma commande :")}`}
+            href={MESSAGERIE.lien(CONTACT, "Bonjour, je souhaite laisser un avis sur ma commande :")}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => { if (!MESSAGERIE.prerempli) copierAvantDePartir("Bonjour, je souhaite laisser un avis sur ma commande :"); }}
             className="inline-flex items-center gap-2 mt-5 px-5 py-3 rounded-xl active:scale-95 transition-transform"
-            style={{ background: "#25D366", color: "#0B0A08", fontFamily: TITRE, fontSize: 15 }}
+            style={{ background: MESSAGERIE.couleur, color: MESSAGERIE.encre, fontFamily: TITRE, fontSize: 15 }}
           >
             <MessageCircle size={16} /> DONNER MON AVIS
           </a>
@@ -690,7 +495,7 @@ function Visionneuse({ produit, famille, depart = 0, onFermer }) {
       <div className="relative flex-1 min-h-0 flex items-center justify-center px-3"
         onTouchStart={debutGlisse} onTouchEnd={finGlisse}>
         {surVideo ? (
-          <video src={produit.video} controls autoPlay playsInline className="max-w-full max-h-full rounded-xl" />
+          <Video source={produit.video} nom={produit.nom} className="max-w-full max-h-full rounded-xl" />
         ) : (
           <>
             <img src={affichees[i]} alt={produit.nom} className="max-w-full max-h-full object-contain rounded-xl" />
@@ -780,7 +585,7 @@ function EcranVideos({ famille, onRetour, onVideo }) {
                       opacity: jouable ? 1 : 0.55,
                     }}
                   >
-                    <img src={affiche} alt={p.nom} className="w-full aspect-square object-cover block" />
+                    <Photo produit={p} secours={SECOURS(p, famille)} source={affiche} alt={p.nom} className="w-full block" />
                     {jouable && (
                       <span className="absolute inset-0 flex items-center justify-center">
                         <span
@@ -963,8 +768,10 @@ export default function Boutique() {
               <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
             ) : famille ? (
               <EcranGammes famille={famille} onGamme={setGamme} onRetour={retour} />
+            ) : PRESENTATION === "liste" ? (
+              <EcranListe onProduit={allerProduit} onFamille={setFamille} />
             ) : (
-              <EcranAccueil onFamille={setFamille} onProduit={allerProduit} />
+              <EcranFamilles onFamille={setFamille} onProduit={allerProduit} />
             )
           )}
         </div>
@@ -1049,14 +856,21 @@ export default function Boutique() {
                   </div>
 
                   <a
-                    href={buildWhatsAppOrder(panier)}
+                    href={lienCommande(panier)}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => { if (!MESSAGERIE.prerempli) copierAvantDePartir(texteCommande(panier)); }}
                     className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl active:scale-95 transition-transform"
-                    style={{ background: "#25D366", color: "#0B0A08", fontFamily: TITRE, fontSize: 16 }}
+                    style={{ background: MESSAGERIE.couleur, color: MESSAGERIE.encre, fontFamily: TITRE, fontSize: 16 }}
                   >
-                    <MessageCircle size={18} /> ENVOYER LA COMMANDE
+                    <MessageCircle size={18} /> ENVOYER SUR {MESSAGERIE.nom.toUpperCase()}
                   </a>
+                  {!MESSAGERIE.prerempli && (
+                    <p className="text-[11.5px] text-center mt-2.5" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.5 }}>
+                      {MESSAGERIE.nom} ne permet pas d'écrire le message à l'avance.
+                      <br /><b style={{ color: texte }}>Ta commande est copiée</b> — colle-la dans la conversation.
+                    </p>
+                  )}
                   <button onClick={() => setPanier([])} className="w-full text-[11px] mt-3 py-1" style={{ color: "#6B6B6B", fontFamily: CORPS }}>
                     Vider le panier
                   </button>
@@ -1069,14 +883,7 @@ export default function Boutique() {
         {/* vidéo du produit */}
         {video && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.96)" }} onClick={() => setVideo(null)}>
-            <video
-              src={video.video}
-              controls
-              autoPlay
-              playsInline
-              className="max-w-full max-h-full rounded-xl"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <Video source={video.video} nom={video.nom} className="max-w-full max-h-full rounded-xl" />
             <button
               onClick={() => setVideo(null)}
               className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
