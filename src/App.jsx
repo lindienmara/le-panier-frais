@@ -1,14 +1,15 @@
 // LE MOTEUR — ASSEMBLAGE
 // ----------------------
-// Ce fichier ne contient plus que les ecrans communs aux deux types (gammes,
+// Ce fichier ne contient plus que les ecrans communs aux trois types (gammes,
 // produits, fiche, infos, liens, avis, intro, visionneuse, videos) et
 // l'aiguillage : selon le type de la boutique, l'accueil est celui du
 // type 1 ou celui du type 2.
 //
-// Trois fichiers, trois roles :
+// Quatre fichiers, quatre roles :
 //   commun.jsx        ce que TOUTES les boutiques partagent
 //   type-familles.jsx le type 1, et lui seul
 //   type-liste.jsx    le type 2, et lui seul
+//   type-luxe.jsx     le type 3, et lui seul
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
@@ -19,14 +20,17 @@ import { visuelFamille, visuelProduit } from "./visuels.js";
 import {
   FONTS, APERCU, BOUTIQUE, COULEURS, FAMILLES, EST_VIDEOS, GALERIE,
   TOUS_PRODUITS, SELECTION_CHEF, VEDETTES, SECOURS, PRESENTATION, AJUSTEMENT,
-  PROPORTION_PHOTO, STYLE_PHOTO, FOND_IMAGE, COLONNE, CARTE, VOILE, FOND_PAGE,
+  CLE, PROPORTION_PHOTO, STYLE_PHOTO, FOND_IMAGE, COLONNE, CARTE, VOILE, FOND_PAGE,
   DEGRADE, TITRE, CORPS, INTRO, ANIMATIONS, telegram, euros, MESSAGERIES,
-  MESSAGERIE, CONTACT, Photo, Video, Etiquette, Prix, BarreSection, Vedettes,
+  MESSAGERIE, CONTACT, Photo, Video, Etiquette, Prix, BarreSection, Vedettes, RemonterEnHaut, MoyensDePaiement, referenceCommande, PEUT_COMMANDER,
+  AVIS, Carrousel, CHOIX,
   cartTotal, texteCommande, lienCommande, copierAvantDePartir,
   fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, cyan,
 } from "./commun.jsx";
 import { EcranFamilles } from "./type-familles.jsx";
 import { EcranListe } from "./type-liste.jsx";
+import { EcranLuxe } from "./type-luxe.jsx";
+import { EcranMarques, EcranCarrousel } from "./type-marques.jsx";
 /* Une famille sans aucune gamme ouvrait un ecran entierement vide : le titre,
    puis rien. Vu du visiteur — et de qui tient la boutique — le bouton semble
    simplement ne pas marcher, alors qu'il a parfaitement fonctionne. On ne
@@ -53,58 +57,37 @@ function RayonVide({ famille, onRetour }) {
   );
 }
 
-function EcranGammes({ famille, onGamme, onRetour }) {
-  // Une gamme sans le moindre produit est un cul-de-sac : on ne la propose pas.
-  const gammes = (famille.gammes || []).filter((g) => (g.produits || []).length > 0);
-  return (
-    <>
-      <BarreSection titre={`${famille.emoji} ${famille.nom}`} onRetour={onRetour} />
-      {gammes.length === 0 && <RayonVide famille={famille} onRetour={onRetour} />}
-      <div className="flex flex-col gap-3 px-3 mt-4">
-        {gammes.map((g) => (
-          <button
-            key={g.id}
-            onClick={() => onGamme(g)}
-            className="rounded-2xl px-4 py-4 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
-            style={{ backgroundImage: `linear-gradient(100deg, ${violet}, ${rose})`, boxShadow: `0 6px 22px ${violet}44` }}
-          >
-            <div className="flex-1 min-w-0">
-              <p style={{ fontFamily: TITRE, fontSize: 21, color: "#fff", letterSpacing: ".5px" }}>
-                {g.nom} <span style={{ fontSize: 13, color: cyan }}>{g.etiquette}</span>
-              </p>
-              <p className="text-[11px] uppercase tracking-wider" style={{ color: "#FFFFFFCC", fontFamily: CORPS }}>
-                {g.sousTitre}
-              </p>
-            </div>
-            <span
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: "#2E5BFF" }}
-            >
-              <ChevronRight size={18} color="#fff" />
-            </span>
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
-
+/* Cliquer une famille amène ICI, directement sur ses articles.
+   Avant, on tombait sur une liste de gammes : un menu de plus à traverser
+   avant de voir la moindre image, alors que c'est l'image qu'on vient
+   chercher. Les gammes n'ont pas disparu — elles sont devenues le filtre en
+   haut de cet écran, et on n'y voit jamais que les articles de la famille
+   choisie. */
 function EcranProduits({ famille, gamme, onProduit, onRetour }) {
   const [recherche, setRecherche] = useState("");
-  const [gammeFiltre, setGammeFiltre] = useState(gamme.id);
+  // « toutes » par défaut : on arrive d'une famille, on veut la voir entière.
+  // La gamme n'est imposée que si l'on vient d'un produit précis.
+  const [gammeFiltre, setGammeFiltre] = useState(gamme ? gamme.id : "toutes");
+
+  // Le filtre peut désigner une gamme d'une AUTRE famille — après un retour,
+  // ou si le catalogue a changé. On le vérifie plutôt que de faire confiance :
+  // sans ça, la recherche échouait et l'écran se vidait sans rien expliquer.
+  const gammeChoisie = famille.gammes.find((g) => g.id === gammeFiltre) || null;
+  const filtreValide = gammeFiltre === "toutes" || !!gammeChoisie;
 
   const produits = useMemo(() => {
-    const source =
-      gammeFiltre === "toutes"
-        ? famille.gammes.flatMap((g) => g.produits.map((p) => ({ ...p, gamme: g })))
-        : famille.gammes.find((g) => g.id === gammeFiltre).produits.map((p) => ({ ...p, gamme: famille.gammes.find((g) => g.id === gammeFiltre) }));
+    // Chaque produit emporte sa clé — voir CLE dans commun.jsx : une référence
+    // peut resservir d'une collection à l'autre, sa place non.
+    const source = !filtreValide || gammeFiltre === "toutes"
+      ? famille.gammes.flatMap((g) => (g.produits || []).map((p, i) => ({ ...p, gamme: g, cle: CLE(famille, g, i, p) })))
+      : (gammeChoisie.produits || []).map((p, i) => ({ ...p, gamme: gammeChoisie, cle: CLE(famille, gammeChoisie, i, p) }));
     const q = recherche.trim().toLowerCase();
     return q ? source.filter((p) => p.nom.toLowerCase().includes(q)) : source;
-  }, [famille, gammeFiltre, recherche]);
+  }, [famille, gammeFiltre, recherche, filtreValide, gammeChoisie]);
 
   return (
     <>
-      <BarreSection titre={gammeFiltre === "toutes" ? famille.nom : famille.gammes.find((g) => g.id === gammeFiltre).nom} onRetour={onRetour} />
+      <BarreSection titre={filtreValide && gammeChoisie ? gammeChoisie.nom : famille.nom} onRetour={onRetour} />
 
       <div className="mx-3 mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5"
         style={{ background: "#1C1C1C", border: `1px solid ${bordure}` }}>
@@ -123,24 +106,30 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
         )}
       </div>
 
-      <div className="mx-3 mt-2">
-        <select
-          value={gammeFiltre}
-          onChange={(e) => setGammeFiltre(e.target.value)}
-          className="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none appearance-none"
-          style={{ background: VOILE("#1C1C1C", "D9"), border: `1px solid ${bordure}`, color: texte, fontFamily: CORPS }}
-        >
-          <option value="toutes">🧑‍🌾 — Toutes les gammes</option>
-          {famille.gammes.map((g) => (
-            <option key={g.id} value={g.id}>{g.nom}</option>
-          ))}
-        </select>
-      </div>
+      {famille.gammes.length > 1 && (
+        <div className="mx-3 mt-2">
+          <select
+            value={filtreValide ? gammeFiltre : "toutes"}
+            onChange={(e) => setGammeFiltre(e.target.value)}
+            className="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none appearance-none"
+            style={{ background: VOILE("#1C1C1C", "D9"), border: `1px solid ${bordure}`, color: texte, fontFamily: CORPS }}
+          >
+            <option value="toutes">Tout {famille.nom} — {famille.gammes.reduce((s, g) => s + (g.produits || []).length, 0)} articles</option>
+            {famille.gammes.map((g) => (
+              <option key={g.id} value={g.id}>{g.nom} — {(g.produits || []).length}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {produits.length === 0 && <RayonVide famille={famille} onRetour={onRetour} />}
+
+      <RemonterEnHaut articles={produits.length} />
 
       <div className="grid grid-cols-2 gap-3 px-3 mt-4">
         {produits.map((p) => (
           <button
-            key={p.ref}
+            key={p.cle || p.ref}
             onClick={() => onProduit(famille, p.gamme, p)}
             className="relative rounded-xl overflow-hidden text-left active:scale-[0.97] transition-transform"
             style={{ background: CARTE, border: `2px solid ${violet}` }}
@@ -178,6 +167,25 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
 
 function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, onVideo }) {
   const [qte, setQte] = useState(1);
+
+  /* LE CHOIX DE LA TAILLE ET DE LA COULEUR.
+     Une ligne de texte « tailles : 39 · 40 · 41 » laisse tout le travail au
+     client : il doit la lire, la retenir, puis la retaper dans son message —
+     et il ne le fait pas. Des pastilles qu'on appuie sont plus rapides à lire,
+     ne se retapent pas, et surtout : le choix voyage AVEC la commande.
+
+     Rien n'est présélectionné. Choisir pour le client, c'est lui vendre une
+     pointure qu'il n'a pas demandée. */
+  const tailles = CHOIX(produit.tailles);
+  const teintes = CHOIX(produit.couleurs);
+  const [taille, setTaille] = useState("");
+  const [couleur, setCouleur] = useState("");
+
+  // Changer de produit sans remettre les choix à zéro ferait partir un 42 pour
+  // un modèle qui ne se fait qu'en 38.
+  useEffect(() => { setTaille(""); setCouleur(""); setQte(1); }, [produit.ref, produit.nom]);
+
+  const manque = (tailles.length && !taille) || (teintes.length && !couleur);
   const image = visuelProduit(produit, famille.couleurs, famille.glyphe);
   const photos = GALERIE(produit);
   const aPlus = photos.length > 1 || !!(produit.description || "").trim() || !!(produit.video || "").trim();
@@ -253,6 +261,69 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
           {produit.description}
         </p>
 
+        {/* TAILLES ET COULEURS.
+            Ce sont les deux questions qu'on pose en magasin avant toute autre,
+            et les deux qui font renoncer quand la réponse manque. Elles vivent
+            ici, sur la fiche commune : une boutique de chaussures en a besoin,
+            mais une boutique de vêtements ou de vaisselle aussi.
+
+            Rien ne s'affiche si le vendeur n'a rien écrit — pas de ligne vide,
+            pas de « non renseigné ». Une boutique d'épicerie ne verra jamais
+            ces deux lignes. */}
+        {(tailles.length > 0 || teintes.length > 0) && (
+          <div className="mt-5">
+            {tailles.length > 0 && (
+              <>
+                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS }}>
+                  Choisir la taille
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {tailles.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTaille(taille === t ? "" : t)}
+                      className="py-2.5 rounded-xl text-[14px] active:scale-95 transition-transform"
+                      style={{
+                        background: taille === t ? texte : CARTE,
+                        color: taille === t ? "#0B0B0B" : texte,
+                        border: `1px solid ${taille === t ? texte : bordure}`,
+                        fontFamily: CORPS, fontWeight: taille === t ? 700 : 500,
+                      }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {teintes.length > 0 && (
+              <>
+                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS, marginTop: tailles.length ? 16 : 0 }}>
+                  Choisir la couleur
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {teintes.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setCouleur(couleur === c ? "" : c)}
+                      className="px-4 py-2.5 rounded-xl text-[14px] active:scale-95 transition-transform"
+                      style={{
+                        background: couleur === c ? texte : CARTE,
+                        color: couleur === c ? "#0B0B0B" : texte,
+                        border: `1px solid ${couleur === c ? texte : bordure}`,
+                        fontFamily: CORPS, fontWeight: couleur === c ? 700 : 500,
+                      }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="mt-5 rounded-2xl p-4" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
           <div className="flex items-end justify-between">
             <div>
@@ -274,13 +345,25 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
             </div>
           </div>
 
-          {produit.dispo ? (
+          {/* Vitrine : aucun chemin pour commander, donc aucun bouton qui le
+              laisserait croire. Le prix et la fiche restent. */}
+          {!PEUT_COMMANDER ? null : produit.dispo ? (
             <button
-              onClick={() => onAjouter(produit, qte)}
+              onClick={() => { if (!manque) onAjouter(produit, qte, taille, couleur); }}
+              disabled={manque}
               className="w-full mt-4 py-3.5 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
-              style={{ backgroundImage: DEGRADE, color: "#fff", fontFamily: TITRE, fontSize: 17, letterSpacing: ".5px" }}
+              style={{
+                backgroundImage: manque ? "none" : DEGRADE,
+                background: manque ? CARTE : undefined,
+                border: manque ? `1px solid ${bordure}` : "none",
+                color: manque ? texteDoux : "#fff",
+                fontFamily: TITRE, fontSize: 17, letterSpacing: ".5px",
+              }}
             >
-              <Plus size={18} /> AJOUTER AU PANIER · {euros(produit.prix * qte)}
+              <Plus size={18} />
+              {manque
+                ? (tailles.length && !taille ? "CHOISIS TA TAILLE" : "CHOISIS TA COULEUR")
+                : `AJOUTER AU PANIER · ${euros(produit.prix * qte)}`}
             </button>
           ) : (
             <p className="w-full mt-4 py-3.5 rounded-xl text-center text-[13px] font-bold"
@@ -341,7 +424,31 @@ function EcranLiens() {
   );
 }
 
+/* L'ONGLET AVIS
+   Les avis ne se déposent PAS depuis la boutique. C'est le vendeur qui les
+   publie, et uniquement sous forme de captures d'écran de vraies conversations
+   — voir l'onglet Avis de l'atelier.
+
+   Il y avait ici un bouton « DONNER MON AVIS » qui ouvrait la messagerie. Il
+   est retiré : il ouvrait une porte que personne n'avait demandé d'ouvrir, il
+   promettait au client que son message serait publié — ce qui n'a jamais été
+   vrai — et il donnait le numéro du vendeur à quiconque passait sur l'onglet,
+   y compris quand aucune façon d'être contacté n'était activée. */
 function EcranAvis() {
+  if (AVIS.length) {
+    return (
+      <>
+        <BarreSection titre="AVIS" />
+        <div className="px-3 mt-4 pb-4">
+          <p className="text-[12px] mb-3" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.55 }}>
+            De vrais messages de clients, en capture d'écran. Appuie sur une image pour la lire en grand.
+          </p>
+          <Carrousel images={AVIS} />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <BarreSection titre="AVIS" />
@@ -350,18 +457,8 @@ function EcranAvis() {
           <Star size={28} color={jaune} className="mx-auto" />
           <p className="mt-3" style={{ fontFamily: TITRE, fontSize: 19, color: texte }}>PAS ENCORE D'AVIS</p>
           <p className="text-[13px] mt-2" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.6 }}>
-            Les avis affichés ici seront de vrais avis de clients. Rien n'est inventé.
+            Les avis affichés ici sont de vrais messages de clients, publiés tels quels. Rien n'est inventé.
           </p>
-          <a
-            href={MESSAGERIE.lien(CONTACT, "Bonjour, je souhaite laisser un avis sur ma commande :")}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => { if (!MESSAGERIE.prerempli) copierAvantDePartir("Bonjour, je souhaite laisser un avis sur ma commande :"); }}
-            className="inline-flex items-center gap-2 mt-5 px-5 py-3 rounded-xl active:scale-95 transition-transform"
-            style={{ background: MESSAGERIE.couleur, color: MESSAGERIE.encre, fontFamily: TITRE, fontSize: 15 }}
-          >
-            <MessageCircle size={16} /> DONNER MON AVIS
-          </a>
         </div>
       </div>
     </>
@@ -576,7 +673,7 @@ function EcranVideos({ famille, onRetour, onVideo }) {
                 const jouable = !!(p.video || "").trim();
                 return (
                   <button
-                    key={p.ref}
+                    key={p.cle || p.ref}
                     onClick={() => jouable && onVideo(p)}
                     className="relative rounded-2xl overflow-hidden text-left active:scale-[0.97] transition-transform"
                     style={{
@@ -628,6 +725,9 @@ export default function Boutique() {
   const [panier, setPanier] = useState([]);
   const [panierOuvert, setPanierOuvert] = useState(false);
   const [vue, setVue] = useState(null);   // { produit, depart } : la visionneuse
+  // Une seule reference par visite : elle doit rester la meme entre le panier,
+  // le message envoye et le virement, sinon elle ne relie rien.
+  const [reference] = useState(referenceCommande);
   const [video, setVideo] = useState(null);
 
   // L'intro ne se rejoue pas à chaque page, seulement à chaque visite. En mode
@@ -649,11 +749,16 @@ export default function Boutique() {
 
   const nbArticles = panier.reduce((s, i) => s + i.qty, 0);
 
-  const ajouter = (p, qte) => {
+/* Deux pointures du même modèle sont DEUX lignes de commande, pas une.
+     C'est pourquoi l'article est reconnu par sa référence ET par la taille et
+     la couleur choisies : sans cela, commander un 42 après un 40 remplacerait
+     silencieusement le premier, et le vendeur enverrait deux fois la même
+     paire. Un client qui ne choisit rien retombe sur l'ancien comportement. */
+  const ajouter = (p, qte, taille = "", couleur = "") => {
+    const meme = (i) => i.ref === p.ref && (i.taille || "") === taille && (i.couleur || "") === couleur;
     setPanier((actuel) => {
-      const existe = actuel.find((i) => i.ref === p.ref);
-      if (existe) return actuel.map((i) => (i.ref === p.ref ? { ...i, qty: i.qty + qte } : i));
-      return [...actuel, { ref: p.ref, nom: p.nom, unite: p.unite, prix: p.prix, qty: qte }];
+      if (actuel.find(meme)) return actuel.map((i) => (meme(i) ? { ...i, qty: i.qty + qte } : i));
+      return [...actuel, { ref: p.ref, nom: p.nom, unite: p.unite, prix: p.prix, qty: qte, taille, couleur }];
     });
     setPanierOuvert(true);
   };
@@ -668,10 +773,20 @@ export default function Boutique() {
     setOnglet("accueil"); setFamille(f); setGamme(g); setProduit(p);
   };
 
+  /* Choisir une famille remet les niveaux du dessous à zéro.
+     Sans ça, un produit ou une gamme d'une visite précédente restait en
+     mémoire : on cliquait sur une famille et c'est l'ancien écran qui
+     revenait. Le bouton semblait alors « ne pas marcher », et seulement de
+     temps en temps — selon ce qu'on avait consulté avant. */
+  const choisirFamille = (f) => {
+    setOnglet("accueil"); setProduit(null); setGamme(null); setFamille(f);
+  };
+
+  // Depuis un article on revient a la famille ; depuis la famille, a l accueil.
+  // Il n y a plus de niveau intermediaire a traverser.
   const retour = () => {
-    if (produit) setProduit(null);
-    else if (gamme) setGamme(null);
-    else if (famille) setFamille(null);
+    if (produit) { setProduit(null); return; }
+    setGamme(null); setFamille(null);
   };
 
   const accueil = () => {
@@ -736,22 +851,24 @@ export default function Boutique() {
                 {BOUTIQUE.nom}
               </p>
             </button>
-            <button
-              onClick={() => setPanierOuvert(true)}
-              className="relative w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
-              style={{ background: CARTE, border: `1px solid ${bordure}` }}
-              aria-label="Ouvrir le panier"
-            >
-              <ShoppingCart size={19} color={texte} />
-              {nbArticles > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full text-[11px] font-bold flex items-center justify-center"
-                  style={{ background: vert, color: "#0B0B0B", border: `2px solid ${fond}` }}
-                >
-                  {nbArticles}
-                </span>
-              )}
-            </button>
+            {PEUT_COMMANDER && (
+              <button
+                onClick={() => setPanierOuvert(true)}
+                className="relative w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
+                style={{ background: CARTE, border: `1px solid ${bordure}` }}
+                aria-label="Ouvrir le panier"
+              >
+                <ShoppingCart size={19} color={texte} />
+                {nbArticles > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full text-[11px] font-bold flex items-center justify-center"
+                    style={{ background: vert, color: "#0B0B0B", border: `2px solid ${fond}` }}
+                  >
+                    {nbArticles}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -764,14 +881,18 @@ export default function Boutique() {
               <EcranVideos famille={famille} onRetour={retour} onVideo={setVideo} />
             ) : produit ? (
               <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onOuvrir={(p, n) => setVue({ produit: p, depart: n || 0 })} onVideo={setVideo} />
-            ) : gamme ? (
-              <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
+            ) : famille && PRESENTATION === "marques" ? (
+              <EcranCarrousel famille={famille} onProduit={allerProduit} onRetour={retour} />
             ) : famille ? (
-              <EcranGammes famille={famille} onGamme={setGamme} onRetour={retour} />
+              <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
             ) : PRESENTATION === "liste" ? (
-              <EcranListe onProduit={allerProduit} onFamille={setFamille} />
+              <EcranListe onProduit={allerProduit} onFamille={choisirFamille} />
+            ) : PRESENTATION === "marques" ? (
+              <EcranMarques onFamille={choisirFamille} />
+            ) : PRESENTATION === "luxe" ? (
+              <EcranLuxe onFamille={choisirFamille} onProduit={allerProduit} />
             ) : (
-              <EcranFamilles onFamille={setFamille} onProduit={allerProduit} />
+              <EcranFamilles onFamille={choisirFamille} onProduit={allerProduit} />
             )
           )}
         </div>
@@ -806,7 +927,7 @@ export default function Boutique() {
         </div>
 
         {/* panier */}
-        {panierOuvert && (
+        {panierOuvert && PEUT_COMMANDER && (
           <div
             className="fixed inset-0 z-40 flex items-end justify-center"
             style={{ background: "rgba(0,0,0,.8)" }}
@@ -855,20 +976,42 @@ export default function Boutique() {
                     <Prix valeur={cartTotal(panier)} taille={30} />
                   </div>
 
-                  <a
-                    href={lienCommande(panier)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => { if (!MESSAGERIE.prerempli) copierAvantDePartir(texteCommande(panier)); }}
-                    className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl active:scale-95 transition-transform"
-                    style={{ background: MESSAGERIE.couleur, color: MESSAGERIE.encre, fontFamily: TITRE, fontSize: 16 }}
-                  >
-                    <MessageCircle size={18} /> ENVOYER SUR {MESSAGERIE.nom.toUpperCase()}
-                  </a>
-                  {!MESSAGERIE.prerempli && (
-                    <p className="text-[11.5px] text-center mt-2.5" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.5 }}>
-                      {MESSAGERIE.nom} ne permet pas d'écrire le message à l'avance.
-                      <br /><b style={{ color: texte }}>Ta commande est copiée</b> — colle-la dans la conversation.
+                  {/* Les moyens de paiement se lisent AVANT d'envoyer la
+                      commande : découvrir qu'on ne peut payer qu'en espèces
+                      après coup, c'est une commande annulée. */}
+                  <div className="mb-3">
+                    <MoyensDePaiement total={cartTotal(panier)} reference={reference} />
+                  </div>
+
+                  {/* Le bouton d'envoi peut être éteint depuis l'atelier : une
+                      boutique qui n'encaisse qu'en ligne n'a pas de commande à
+                      recevoir dans une conversation. */}
+                  {/* Sans contact renseigné, le lien mènerait dans le vide :
+                      wa.me sans numéro, t.me sans pseudo. Un bouton qui ne mène
+                      nulle part est pire que pas de bouton. */}
+                  {BOUTIQUE.commandeActive !== false && CONTACT ? (
+                    <>
+                      <a
+                        href={lienCommande(panier, reference)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => { if (!MESSAGERIE.prerempli) copierAvantDePartir(texteCommande(panier, reference)); }}
+                        className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl active:scale-95 transition-transform"
+                        style={{ background: MESSAGERIE.couleur, color: MESSAGERIE.encre, fontFamily: TITRE, fontSize: 16 }}
+                      >
+                        <MessageCircle size={18} /> ENVOYER SUR {MESSAGERIE.nom.toUpperCase()}
+                      </a>
+                      {!MESSAGERIE.prerempli && (
+                        <p className="text-[11.5px] text-center mt-2.5" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.5 }}>
+                          {MESSAGERIE.nom} ne permet pas d'écrire le message à l'avance.
+                          <br /><b style={{ color: texte }}>Ta commande est copiée</b> — colle-la dans la conversation.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[11.5px] text-center" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.5 }}>
+                      Règle ta commande par un des moyens ci-dessus,
+                      <br />en indiquant la référence <b style={{ color: jaune }}>{reference}</b>.
                     </p>
                   )}
                   <button onClick={() => setPanier([])} className="w-full text-[11px] mt-3 py-1" style={{ color: "#6B6B6B", fontFamily: CORPS }}>

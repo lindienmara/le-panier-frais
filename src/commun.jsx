@@ -54,8 +54,24 @@ export const EST_VIDEOS = (f) => f.type === "videos";
 export const GALERIE = (p) =>
   Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
 
+/* ★ POURQUOI UNE CLÉ, ET PAS LA RÉFÉRENCE DU PRODUIT
+   React identifie chaque carte d'une liste par une « clé ». Deux cartes de même
+   clé, et il les confond : en changeant de famille, il garde les anciennes
+   cartes, en oublie de nouvelles, et mélange les deux. À l'écran, ça donne des
+   articles qui manquent et des articles d'une autre famille qui s'ajoutent à la
+   suite — sans la moindre erreur signalée.
+
+   Or rien n'oblige une référence à être unique : REF-003 peut servir dans trois
+   collections différentes, et c'est bien légitime. La clé est donc construite
+   ici, à partir de l'endroit exact où le produit se trouve — famille, gamme,
+   rang. Deux produits ne peuvent pas occuper la même place.
+
+   Conséquence : les catalogues qui réutilisent leurs références s'affichent
+   correctement, sans avoir à les renuméroter. */
+export const CLE = (f, g, i, p) => `${f.id}|${g.id}|${i}|${p.ref || ""}`;
+
 export const TOUS_PRODUITS = FAMILLES.filter((f) => !EST_VIDEOS(f)).flatMap((f) =>
-  f.gammes.flatMap((g) => g.produits.map((p) => ({ ...p, famille: f, gamme: g })))
+  f.gammes.flatMap((g) => g.produits.map((p, i) => ({ ...p, famille: f, gamme: g, cle: CLE(f, g, i, p) })))
 );
 export const SELECTION_CHEF = TOUS_PRODUITS.filter((p) => p.chef);
 
@@ -72,7 +88,8 @@ export const VEDETTES = TOUS_PRODUITS.filter((p) => p.vedette).slice(0, 8);
 // Le dessin de secours d un produit : le meme visuel, sans sa photo.
 export const SECOURS = (p, famille) => visuelProduit({ ...p, image: "", images: [] }, famille.couleurs, famille.glyphe);
 
-export const PRESENTATION = BOUTIQUE.presentation === "liste" ? "liste" : "familles";
+export const PRESENTATION = ["liste", "luxe", "marques"].includes(BOUTIQUE.presentation)
+  ? BOUTIQUE.presentation : "familles";
 
 // Cadrage des photos. « carre » remplit le cadre quitte à couper les bords,
 // « entier » montre toute l'image quitte à laisser des bandes. Jamais de
@@ -230,15 +247,211 @@ export const MESSAGERIE = MESSAGERIES[BOUTIQUE.messagerie] || MESSAGERIES.whatsa
 // écrites avant ce choix.
 export const CONTACT = String(BOUTIQUE.contact || BOUTIQUE.whatsapp || "").trim();
 
-export function texteCommande(items) {
-  const lignes = items.map(
-    (i) => `• ${i.nom} — ${i.unite} (réf. ${i.ref}) x${i.qty} — ${euros(i.prix * i.qty)}`
-  );
-  return `${BOUTIQUE.accroche}\n\n${lignes.join("\n")}\n\nTotal : ${euros(cartTotal(items))}`;
+/* ═══════ LES MOYENS DE PAIEMENT ═══════
+   Annoncés avant que le client commande, jamais après : savoir qu'on ne peut
+   payer qu'en espèces se découvre au moment de choisir, pas une fois le message
+   envoyé.
+
+   ★ La boutique ne demande JAMAIS de numéro de carte, et n'en recevra jamais.
+   Elle n'a pas de serveur : un numéro saisi ici ne serait protégé par personne.
+   Les liens ci-dessous ouvrent la page du prestataire — c'est lui qui encaisse,
+   sur sa propre page. */
+const CATALOGUE_PAIEMENTS = {
+  paypal: { nom: "PayPal", emoji: "🅿️", choix: true },
+  revolut: { nom: "Revolut", emoji: "🔵" },
+  lydia: { nom: "Lydia", emoji: "🇱" },
+  wero: { nom: "Wero", emoji: "🇪🇺" },
+};
+
+/* Sur PayPal, le client choisit lui-même entre deux façons de payer, et ce
+   choix ne se devine pas. Le vendeur dit laquelle il attend ; la boutique la
+   lui rappelle au moment exact où il va la choisir — pas avant, pas après. */
+const CONSIGNES = {
+  proches: "Choisis « Entre proches » — aucun frais.",
+  biens: "Choisis « Biens et services » au moment de payer.",
+};
+
+/* Le montant du panier ajouté au lien — uniquement là où le prestataire
+   documente ce format. PayPal et Revolut le font ; Lydia et Wero non. Fabriquer
+   une adresse au jugé enverrait le client sur une page cassée, ce qui est pire
+   que de le laisser saisir la somme lui-même. */
+function avecMontant(id, lien, total) {
+  const base = String(lien || "").replace(/\/+$/, "");
+  const somme = Number(total);
+  if (!base || !(somme > 0)) return base;
+  // PayPal seul : paypal.me/nom/12.50 est un format publié. Pour les autres, on
+  // ne fabrique rien — une adresse inventée mène à une page introuvable, et le
+  // client abandonne. Mieux vaut qu'il saisisse la somme.
+  if (id === "paypal" && /paypal\.me\//i.test(base)) return `${base}/${somme.toFixed(2)}`;
+  return base;
 }
 
-export function lienCommande(items) {
-  return MESSAGERIE.lien(CONTACT, texteCommande(items));
+// Un lien qui n'est pas en https:// n'est pas affiché : le moteur ne fait
+// confiance à rien, pas même à ce qu'il a écrit lui-même.
+const lienSur = (u) => {
+  try {
+    return new URL(String(u || "")).protocol === "https:" ? String(u) : "";
+  } catch (e) {
+    return "";
+  }
+};
+
+/* ★ UN MOYEN SANS COMPTE RELIÉ N'EST JAMAIS PROPOSÉ.
+   Afficher « PayPal » sans lien, c'est promettre au client un paiement qu'il ne
+   pourra pas faire : il clique, rien ne s'ouvre, et il repart. Pire, il peut
+   croire avoir payé.
+
+   La règle est donc sans exception : pas de lien valide, pas de moyen affiché.
+   Un moyen coché dans l'atelier mais laissé sans adresse n'existe pas pour le
+   client — l'atelier le dit en clair de son côté. */
+export const PAIEMENTS = (BOUTIQUE.paiements || [])
+  .filter((p) => p && (CATALOGUE_PAIEMENTS[p.id] || (p.id === "perso" && p.nom)))
+  .map((p) => ({
+    id: p.id,
+    nom: CATALOGUE_PAIEMENTS[p.id] ? CATALOGUE_PAIEMENTS[p.id].nom : p.nom,
+    emoji: CATALOGUE_PAIEMENTS[p.id] ? CATALOGUE_PAIEMENTS[p.id].emoji : (p.emoji || "💳"),
+    lien: lienSur(p.lien),
+    note: p.note || "",
+    consigne: (CATALOGUE_PAIEMENTS[p.id] || {}).choix ? CONSIGNES[p.nature] || "" : "",
+  }))
+  .filter((p) => !!p.lien);
+
+/* ★ BOUTIQUE OU VITRINE — la boutique le déduit, on ne le lui dit pas.
+
+   Commander suppose un chemin : soit une conversation où envoyer la commande,
+   soit un moyen de paiement relié. Sans ni l'un ni l'autre, il n'existe aucune
+   façon d'acheter — et un panier ne sert alors qu'à décevoir : on y met des
+   articles, on cherche comment valider, il n'y a rien.
+
+   Dans ce cas la boutique devient une VITRINE : les articles, les photos et les
+   prix restent, le panier disparaît entièrement. C'est un usage légitime — un
+   catalogue qu'on montre, une carte de restaurant, une collection — et non une
+   boutique en panne. */
+export const PEUT_COMMANDER =
+  (BOUTIQUE.commandeActive !== false && CONTACT !== "") || PAIEMENTS.length > 0;
+
+/* La référence de commande.
+   Un virement arrive chez le vendeur sans dire à quelle commande il répond :
+   « X vous a envoyé 3,20 € », et rien d'autre. Avec deux clients dans la même
+   minute, plus moyen de savoir qui a payé quoi.
+
+   Cette référence courte relie les deux. Elle s'affiche au client, part dans le
+   message de commande, et il la recopie dans le mot du virement. Elle ne
+   protège de rien — elle permet seulement de s'y retrouver, ce qui manquait. */
+export function referenceCommande() {
+  const t = Date.now().toString(36).toUpperCase();
+  return t.slice(-4);
+}
+
+export function MoyensDePaiement({ total = 0, reference = "" }) {
+  // Aucun moyen relié : le bloc entier disparaît, note comprise. Une précision
+  // sur un paiement qui n'existe pas n'aurait aucun sens.
+  if (!PAIEMENTS.length) return null;
+  return (
+    <div className="rounded-xl px-3 py-3" style={{ background: VOILE("#131317", "D9"), border: `1px solid ${bordure}` }}>
+      <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS }}>
+        Paiement accepté
+      </p>
+
+      {/* Le montant et la référence, en gros et au même endroit. C'est ce que
+          le client doit saisir là où rien ne le pré-remplit — et ce que le
+          vendeur retrouvera sur son relevé. */}
+      {total > 0 && (
+        <div className="rounded-lg px-3 py-2 mb-2" style={{ background: "#00000066", border: `1px solid ${jaune}44` }}>
+          <p className="text-[11px]" style={{ color: texteDoux, fontFamily: CORPS }}>
+            Montant à envoyer
+          </p>
+          <p style={{ fontFamily: TITRE, fontSize: 24, color: jaune, lineHeight: 1.1 }}>{euros(total)}</p>
+          {reference && (
+            <p className="text-[11px] mt-1" style={{ color: texte, fontFamily: CORPS }}>
+              Indique la référence <b style={{ color: jaune }}>{reference}</b> dans le message du paiement.
+            </p>
+          )}
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        {PAIEMENTS.map((p) => (
+          p.lien ? (
+            <a
+              key={p.id}
+              href={avecMontant(p.id, p.lien, total)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2"
+              style={{ background: CARTE, border: `1px solid ${vert}66`, textDecoration: "none" }}
+            >
+              <span style={{ fontSize: 15 }}>{p.emoji}</span>
+              <span className="flex-1 min-w-0" style={{ fontFamily: CORPS }}>
+                <span className="block text-[12.5px] font-bold" style={{ color: texte }}>
+                  {p.nom}{p.note ? ` — ${p.note}` : ""}
+                </span>
+                {p.consigne && (
+                  <span className="block text-[10.5px] mt-0.5" style={{ color: texteDoux }}>
+                    {p.consigne}
+                  </span>
+                )}
+              </span>
+              <span className="text-[11px] flex-shrink-0" style={{ color: vert, fontFamily: CORPS }}>
+                {avecMontant(p.id, p.lien, total) !== p.lien ? `payer ${euros(total)} ↗` : "ouvrir ↗"}
+              </span>
+            </a>
+          ) : (
+            <div key={p.id} className="flex items-center gap-2.5 px-2.5 py-1">
+              <span style={{ fontSize: 15 }}>{p.emoji}</span>
+              <span className="text-[12.5px]" style={{ color: texte, fontFamily: CORPS }}>
+                {p.nom}{p.note ? ` — ${p.note}` : ""}
+              </span>
+            </div>
+          )
+        ))}
+      </div>
+      {(BOUTIQUE.paiementNote || "").trim() && (
+        <p className="text-[11px] mt-2" style={{ color: texteDoux, fontFamily: CORPS }}>
+          {BOUTIQUE.paiementNote}
+        </p>
+      )}
+      <p className="text-[10px] mt-2" style={{ color: texteDoux, fontFamily: CORPS }}>
+        Cette boutique ne demande jamais de numéro de carte. Un paiement en ligne se fait
+        sur la page du prestataire, jamais ici.
+      </p>
+    </div>
+  );
+}
+
+/* DÉCOUPER UNE LISTE ÉCRITE À LA MAIN.
+   Le vendeur tape « 39 · 40 · 41 », ou « 39, 40, 41 », ou « 39/40/41 », ou
+   « 39 40 41 » — et il a raison à chaque fois. C'est au logiciel de s'adapter,
+   pas au vendeur d'apprendre une syntaxe.
+
+   On coupe donc sur tout ce qui sépare visiblement, et on garde l'ordre écrit :
+   une pointure se lit de la plus petite à la plus grande, et le vendeur l'a
+   déjà rangée ainsi. */
+export const CHOIX = (texte) =>
+  String(texte || "")
+    .split(/[·,;|\/\n]+|\s{2,}/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+export function texteCommande(items, reference = "") {
+  const lignes = items.map((i) => {
+    // La taille et la couleur choisies partent AVEC la commande. Sans elles,
+    // le vendeur doit rappeler chaque client pour les lui demander.
+    const precisions = [i.taille, i.couleur].filter(Boolean).join(", ");
+    return `• ${i.nom}${precisions ? " (" + precisions + ")" : ""} — ${i.unite} (réf. ${i.ref}) x${i.qty} — ${euros(i.prix * i.qty)}`;
+  });
+  // Le moyen de paiement voyage avec la commande : le client garde une trace
+  // de ce qui a été annoncé, et toi aussi. Aucun lien n'est recopié ici — un
+  // lien de paiement se clique sur la boutique, pas dans une conversation.
+  const moyens = PAIEMENTS.length
+    ? `\n\nPaiement accepté : ${PAIEMENTS.map((p) => p.nom).join(", ")}`
+    : "";
+  // La référence, pour que le vendeur rapproche un virement d'une commande.
+  const ref = reference ? `\n\nRéférence : ${reference}` : "";
+  return `${BOUTIQUE.accroche}\n\n${lignes.join("\n")}\n\nTotal : ${euros(cartTotal(items))}${ref}${moyens}`;
+}
+
+export function lienCommande(items, reference = "") {
+  return MESSAGERIE.lien(CONTACT, texteCommande(items, reference));
 }
 
 // Copie déclenchée par le clic lui-même : la navigation continue normalement.
@@ -342,6 +555,276 @@ export function BarreSection({ titre, onRetour }) {
 // « vedettesSeules » sert à la présentation en liste : elle réutilise le haut
 // de l'accueil — les carrés en vedette — puis affiche sa propre grille.
 
+/* ══════════ REMONTER EN HAUT ══════════
+   Une famille de cent articles fait une page très longue. Arrivé en bas, il
+   faut pouvoir revenir d'un geste : sans ça, on fait défiler à l'envers pendant
+   dix secondes, ou on abandonne.
+
+   Le bouton n'apparaît qu'une fois qu'on a vraiment descendu — plus tôt, il ne
+   servirait qu'à encombrer. Il se place au-dessus de la barre du bas, du côté
+   du pouce. */
+// ★ Pas d'écoute du défilement, volontairement.
+// Une première version n'affichait le bouton qu'une fois descendu. Elle
+// dépendait des événements de défilement — et il existe des navigateurs qui
+// n'en émettent aucun alors que la page défile pour de bon. Le bouton restait
+// alors introuvable, sans qu'on comprenne pourquoi.
+//
+// La condition est donc devenue une donnée, pas un événement : on affiche le
+// bouton quand la liste est longue. C'est vérifiable, ça ne dépend d'aucun
+// navigateur, et ça répond à la vraie question — « cette page est-elle longue
+// au point qu'on veuille en remonter ? »
+export function RemonterEnHaut({ articles = 0, seuil = 12 }) {
+  if (articles < seuil) return null;
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      aria-label="Revenir en haut de la page"
+      className="fixed z-40 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+      style={{
+        right: 14, bottom: 92, width: 46, height: 46,
+        background: VOILE("#141018", "E6"), border: `1.5px solid ${jaune}`,
+        boxShadow: `0 6px 20px #000000AA`, color: jaune,
+        fontFamily: CORPS, fontSize: 19, lineHeight: 1,
+      }}
+    >
+      ↑
+    </button>
+  );
+}
+
+/* ══════════ LES AVIS, EN IMAGES ══════════
+   Un avis recopié à la main ne prouve rien : n'importe qui peut écrire
+   « super vendeur ». Une capture d'écran de la conversation, elle, se voit.
+   C'est pourquoi les avis sont des IMAGES, montrées telles quelles — jamais
+   recadrées, jamais retouchées.
+
+   Elles défilent en carrousel : une à l'écran, on glisse pour la suivante. Une
+   capture de conversation est haute et étroite ; on la laisse donc entière dans
+   sa hauteur, quitte à ce qu'elle ne remplisse pas la largeur.
+
+   Un appui l'ouvre en grand : sur un téléphone, le texte d'une conversation
+   réduite à la largeur d'une carte est illisible. */
+export const AVIS = Array.isArray(BOUTIQUE.avis)
+  ? BOUTIQUE.avis.filter((a) => (a.image || "").trim())
+  : [];
+
+export function Carrousel({ images }) {
+  const [i, setI] = useState(0);
+  const [plein, setPlein] = useState(false);
+  const doigtX = useRef(null);
+
+  const n = images.length;
+  const suivante = () => setI((k) => (k + 1) % n);
+  const precedente = () => setI((k) => (k - 1 + n) % n);
+
+  // Une image retirée pendant qu'on la regardait ne doit pas laisser un cadre
+  // vide : on revient sur la dernière existante.
+  useEffect(() => { if (i >= n) setI(0); }, [n, i]);
+
+  useEffect(() => {
+    if (!plein) return;
+    const touche = (e) => {
+      if (e.key === "Escape") setPlein(false);
+      else if (e.key === "ArrowRight" && n > 1) suivante();
+      else if (e.key === "ArrowLeft" && n > 1) precedente();
+    };
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  }, [plein, n]);
+
+  const debutGlisse = (e) => { doigtX.current = e.touches[0].clientX; };
+  const finGlisse = (e) => {
+    if (doigtX.current === null || n < 2) return;
+    const ecart = e.changedTouches[0].clientX - doigtX.current;
+    if (Math.abs(ecart) > 45) (ecart < 0 ? suivante : precedente)();
+    doigtX.current = null;
+  };
+
+  if (!n) return null;
+  const courant = images[Math.min(i, n - 1)];
+
+  const Fleche = ({ cote, onClick, children }) => (
+    <button
+      onClick={onClick}
+      aria-label={cote === "g" ? "Avis précédent" : "Avis suivant"}
+      className="absolute top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+      style={{
+        [cote === "g" ? "left" : "right"]: 8,
+        background: "#0C0C10D9", border: `1px solid ${bordure}`, color: texte,
+      }}
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <>
+      <div className="rounded-2xl overflow-hidden" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
+        <div className="relative" onTouchStart={debutGlisse} onTouchEnd={finGlisse}>
+          <button
+            onClick={() => setPlein(true)}
+            className="block w-full"
+            style={{ background: "#08080C", lineHeight: 0 }}
+            aria-label="Voir cet avis en grand"
+          >
+            <img
+              src={courant.image}
+              alt={courant.legende || "Avis d'un client"}
+              className="w-full object-contain"
+              style={{ maxHeight: "62vh" }}
+            />
+          </button>
+
+          {n > 1 && (
+            <>
+              <Fleche cote="g" onClick={precedente}><ChevronLeft size={18} /></Fleche>
+              <Fleche cote="d" onClick={suivante}><ChevronRight size={18} /></Fleche>
+              <span
+                className="absolute top-2 right-2 px-2 py-1 rounded-lg text-[11px] font-bold"
+                style={{ background: "#0C0C10D9", color: texteDoux, border: `1px solid ${bordure}`, fontFamily: CORPS }}
+              >
+                {i + 1} / {n}
+              </span>
+            </>
+          )}
+
+          <span
+            className="absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: "#0C0C10D9", border: `1px solid ${bordure}`, color: texteDoux }}
+          >
+            <Maximize2 size={14} />
+          </span>
+        </div>
+
+        {courant.legende ? (
+          <p className="px-3 py-2.5 text-[12.5px]" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.5 }}>
+            {courant.legende}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Les pastilles : elles disent combien il y en a, et où l'on en est. */}
+      {n > 1 && (
+        <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
+          {images.map((a, k) => (
+            <button
+              key={k}
+              onClick={() => setI(k)}
+              aria-label={`Avis ${k + 1}`}
+              className="rounded-full transition-all"
+              style={{
+                width: k === i ? 22 : 7, height: 7,
+                background: k === i ? jaune : bordure,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {plein && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,.97)" }}>
+          <div className="flex items-center gap-2 px-3 pt-3 pb-2 flex-shrink-0">
+            <p className="flex-1 truncate" style={{ fontFamily: TITRE, fontSize: 17, color: texte }}>
+              AVIS {i + 1} / {n}
+            </p>
+            <button
+              onClick={() => setPlein(false)}
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "#1A1A1ACC", border: `1px solid ${bordure}` }}
+              aria-label="Fermer"
+            >
+              <X size={17} color={texte} />
+            </button>
+          </div>
+          <div className="relative flex-1 min-h-0 flex items-center justify-center px-3"
+            onTouchStart={debutGlisse} onTouchEnd={finGlisse}>
+            <img src={courant.image} alt={courant.legende || "Avis d'un client"}
+              className="max-w-full max-h-full object-contain rounded-xl" />
+            {n > 1 && (
+              <>
+                <Fleche cote="g" onClick={precedente}><ChevronLeft size={18} /></Fleche>
+                <Fleche cote="d" onClick={suivante}><ChevronRight size={18} /></Fleche>
+              </>
+            )}
+          </div>
+          {courant.legende ? (
+            <p className="px-4 pb-4 pt-2 text-center text-[13px] flex-shrink-0"
+              style={{ color: texteDoux, fontFamily: CORPS }}>
+              {courant.legende}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ══════════ TOUTES LES FAMILLES ══════════
+   Une rangée de pastilles qui défile de côté cache ce qui dépasse de l'écran :
+   passé la troisième famille, le client ne sait même pas que les autres
+   existent. Ce bouton ouvre la liste complète, en pleine largeur, avec le
+   nombre d'articles de chacune — plus rien n'est caché.
+
+   Il sert dans les deux sens : choisir une famille, ou revenir à l'ensemble. */
+export function ToutesLesFamilles({ familles, actif, onFamille, onTout, total, etiquette = "Toutes les familles" }) {
+  const [ouvert, setOuvert] = useState(false);
+  const compte = (f) => (f.gammes || []).reduce((s, g) => s + (g.produits || []).length, 0);
+
+  return (
+    <div className="px-3 mt-3">
+      <button
+        onClick={() => setOuvert(!ouvert)}
+        className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 active:scale-[0.99] transition-transform"
+        style={{ background: VOILE("#1C1C1C", "D9"), border: `1.5px solid ${jaune}66`,
+                 fontFamily: CORPS, fontSize: 13, fontWeight: 700, color: texte }}
+      >
+        <span style={{ color: jaune, fontSize: 15, lineHeight: 1 }}>☰</span>
+        <span className="flex-1 text-left">{etiquette}</span>
+        <span style={{ color: texteDoux, fontWeight: 400, fontSize: 12 }}>
+          {familles.length} · {ouvert ? "fermer" : "voir"}
+        </span>
+      </button>
+
+      {ouvert && (
+        <div className="mt-2 rounded-xl overflow-hidden" style={{ border: `1px solid ${bordure}` }}>
+          {onTout && (
+            <button
+              onClick={() => { onTout(); setOuvert(false); }}
+              className="w-full flex items-center gap-3 px-3 py-3 text-left"
+              style={{ background: actif === "tous" ? VOILE("#241830", "E6") : CARTE,
+                       borderBottom: `1px solid ${bordure}`, fontFamily: CORPS, fontSize: 13,
+                       fontWeight: 700, color: actif === "tous" ? jaune : texte }}
+            >
+              <span style={{ fontSize: 15 }}>🛍️</span>
+              <span className="flex-1">Tout voir</span>
+              <span style={{ color: texteDoux, fontWeight: 400, fontSize: 12 }}>{total} articles</span>
+            </button>
+          )}
+          {familles.map((f, i) => (
+            <button
+              key={f.id}
+              onClick={() => { onFamille(f); setOuvert(false); }}
+              className="w-full flex items-center gap-3 px-3 py-3 text-left"
+              style={{ background: actif === f.id ? VOILE("#241830", "E6") : CARTE,
+                       borderBottom: i < familles.length - 1 ? `1px solid ${bordure}` : "none",
+                       fontFamily: CORPS, fontSize: 13, fontWeight: 700,
+                       color: actif === f.id ? jaune : texte }}
+            >
+              <span style={{ fontSize: 15 }}>{f.emoji}</span>
+              <span className="flex-1 min-w-0" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {f.nom}
+              </span>
+              {EST_VIDEOS(f)
+                ? <PlayCircle size={13} color={cyan} />
+                : <span style={{ color: texteDoux, fontWeight: 400, fontSize: 12 }}>{compte(f)} articles</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ══════════ LES VEDETTES ══════════
    De petits carres noirs, quatre par ligne. Compacts par principe : le
    catalogue doit rester visible juste en dessous, sans faire defiler.
@@ -352,7 +835,7 @@ export function Vedettes({ onProduit }) {
     <div className="mx-3 mt-3 grid grid-cols-4 gap-2">
             {VEDETTES.map((p) => (
               <button
-                key={p.ref}
+                key={p.cle || p.ref}
                 onClick={() => onProduit(p.famille, p.gamme, p)}
                 className="relative rounded-xl overflow-hidden text-left active:scale-95 transition-transform"
                 style={{ background: "#000", border: `1px solid ${jaune}55` }}

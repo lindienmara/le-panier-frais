@@ -10,7 +10,7 @@
 
 export const MOTEUR = {
   modele: "vitrine-3-niveaux",
-  version: "3.9",
+  version: "3.23",
   // Ce que sait faire cette version, pour information.
   capacites: [
     "familles > gammes > produits",
@@ -29,5 +29,23 @@ export const MOTEUR = {
     "les deux types de boutique sont separes : corriger l un ne touche pas l autre",
     "choisir une categorie ne montre plus que cette categorie",
     "une famille sans article le dit, au lieu d ouvrir un ecran vide",
+    "trois types de boutique : par familles, en liste, ou La Maison",
+    "une famille mene directement a ses articles, avec un bouton pour remonter",
+    "des references de produit en double n empechent plus l affichage",
+    "un bouton ouvre la liste complete des familles, rien n est cache hors de l ecran",
+    "moyens de paiement annonces, avec liens vers le prestataire",
+    "le montant du panier est ajoute au lien PayPal",
+    "moyens de paiement sur mesure, nom et lien au choix du vendeur",
+    "un moyen de paiement sans compte relie n est jamais propose au client",
+    "compte prive ou pro, paiement entre proches ou biens et services, au choix",
+    "reference de commande, pour rapprocher un virement d une commande",
+    "le bouton d envoi dans la conversation peut etre eteint",
+    "sans contact ni paiement, la boutique devient une vitrine sans panier",
+    "des avis en images : les captures de conversations defilent en carrousel",
+    "le client ne depose plus d avis lui-meme : le vendeur seul les publie",
+    "sans moyen d etre contacte, aucun lien vers la messagerie nulle part",
+    "quatre types de boutique : familles, liste, La Maison, ou par marques",
+    "type par marques : une grande photo par marque, puis un carrousel page a page",
+    "taille et couleur sur la fiche produit, affichees seulement si renseignees",
   ],
 };
