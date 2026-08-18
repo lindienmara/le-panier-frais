@@ -23,7 +23,7 @@ import {
   CLE, PROPORTION_PHOTO, STYLE_PHOTO, FOND_IMAGE, COLONNE, CARTE, VOILE, FOND_PAGE,
   DEGRADE, TITRE, CORPS, INTRO, ANIMATIONS, telegram, euros, MESSAGERIES,
   MESSAGERIE, CONTACT, Photo, Video, Etiquette, Prix, BarreSection, Vedettes, RemonterEnHaut, MoyensDePaiement, referenceCommande, PEUT_COMMANDER,
-  AVIS, Carrousel, CHOIX,
+  AVIS, Carrousel, CHOIX, ChoixEtCommande,
   cartTotal, texteCommande, lienCommande, copierAvantDePartir,
   fond, fondCarte, bordure, texte, texteDoux, rose, violet, vert, jaune, cyan,
 } from "./commun.jsx";
@@ -166,35 +166,6 @@ function EcranProduits({ famille, gamme, onProduit, onRetour }) {
 }
 
 function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, onVideo }) {
-  const [qte, setQte] = useState(1);
-
-  /* LE CHOIX DE LA TAILLE ET DE LA COULEUR.
-     Une ligne de texte « tailles : 39 · 40 · 41 » laisse tout le travail au
-     client : il doit la lire, la retenir, puis la retaper dans son message —
-     et il ne le fait pas. Des pastilles qu'on appuie sont plus rapides à lire,
-     ne se retapent pas, et surtout : le choix voyage AVEC la commande.
-
-     Rien n'est présélectionné. Choisir pour le client, c'est lui vendre une
-     pointure qu'il n'a pas demandée. */
-  const tailles = CHOIX(produit.tailles);
-  const teintes = CHOIX(produit.couleurs);
-
-  /* LES POINTURES EN RUPTURE.
-     Un magasin de chaussures a toujours des trous : le 41 est parti, le 44
-     n'est pas encore arrivé. Les MASQUER serait une faute — le client cherche
-     sa taille, ne la voit pas, et croit que le modèle ne se fait pas dans sa
-     pointure. Il faut au contraire qu'il la voie, barrée : il sait alors que
-     c'est son modèle, mais pas aujourd'hui, et il revient. */
-  const epuisees = new Set(CHOIX(produit.taillesEpuisees));
-  const [taille, setTaille] = useState("");
-  const [couleur, setCouleur] = useState("");
-
-  // Changer de produit sans remettre les choix à zéro ferait partir un 42 pour
-  // un modèle qui ne se fait qu'en 38.
-  useEffect(() => { setTaille(""); setCouleur(""); setQte(1); }, [produit.ref, produit.nom]);
-  useEffect(() => { if (taille && epuisees.has(taille)) setTaille(""); }, [taille, produit.taillesEpuisees]);
-
-  const manque = (tailles.length && !taille) || (teintes.length && !couleur);
   const image = visuelProduit(produit, famille.couleurs, famille.glyphe);
   const photos = GALERIE(produit);
   const aPlus = photos.length > 1 || !!(produit.description || "").trim() || !!(produit.video || "").trim();
@@ -279,116 +250,8 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
             Rien ne s'affiche si le vendeur n'a rien écrit — pas de ligne vide,
             pas de « non renseigné ». Une boutique d'épicerie ne verra jamais
             ces deux lignes. */}
-        {(tailles.length > 0 || teintes.length > 0) && (
-          <div className="mt-5">
-            {tailles.length > 0 && (
-              <>
-                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS }}>
-                  Choisir la taille
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {tailles.map((t) => {
-                    const partie = epuisees.has(t);
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => { if (!partie) setTaille(taille === t ? "" : t); }}
-                        disabled={partie}
-                        aria-label={partie ? t + " — épuisée" : t}
-                        className="py-2.5 rounded-xl text-[14px] transition-transform"
-                        style={{
-                          background: taille === t ? texte : CARTE,
-                          color: partie ? texteDoux : taille === t ? "#0B0B0B" : texte,
-                          border: `1px solid ${taille === t ? texte : bordure}`,
-                          fontFamily: CORPS, fontWeight: taille === t ? 700 : 500,
-                          textDecoration: partie ? "line-through" : "none",
-                          opacity: partie ? 0.5 : 1,
-                          cursor: partie ? "default" : "pointer",
-                        }}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            {teintes.length > 0 && (
-              <>
-                <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS, marginTop: tailles.length ? 16 : 0 }}>
-                  Choisir la couleur
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {teintes.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setCouleur(couleur === c ? "" : c)}
-                      className="px-4 py-2.5 rounded-xl text-[14px] active:scale-95 transition-transform"
-                      style={{
-                        background: couleur === c ? texte : CARTE,
-                        color: couleur === c ? "#0B0B0B" : texte,
-                        border: `1px solid ${couleur === c ? texte : bordure}`,
-                        fontFamily: CORPS, fontWeight: couleur === c ? 700 : 500,
-                      }}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="mt-5 rounded-2xl p-4" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider" style={{ color: texteDoux, fontFamily: CORPS }}>Prix</p>
-              <Prix valeur={produit.prix} taille={32} />
-              <p className="text-[12px]" style={{ color: texteDoux, fontFamily: CORPS }}>{produit.unite}</p>
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider mb-1 text-right" style={{ color: texteDoux, fontFamily: CORPS }}>Quantité</p>
-              <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: VOILE(fond, "CC"), border: `1px solid ${bordure}` }}>
-                <button onClick={() => setQte((q) => Math.max(1, q - 1))} className="w-8 h-8 rounded-lg flex items-center justify-center active:scale-90" aria-label="Moins">
-                  <Minus size={14} color={texte} />
-                </button>
-                <span className="w-7 text-center font-bold" style={{ color: texte, fontFamily: CORPS }}>{qte}</span>
-                <button onClick={() => setQte((q) => q + 1)} className="w-8 h-8 rounded-lg flex items-center justify-center active:scale-90" aria-label="Plus">
-                  <Plus size={14} color={texte} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Vitrine : aucun chemin pour commander, donc aucun bouton qui le
-              laisserait croire. Le prix et la fiche restent. */}
-          {!PEUT_COMMANDER ? null : produit.dispo ? (
-            <button
-              onClick={() => { if (!manque) onAjouter(produit, qte, taille, couleur); }}
-              disabled={manque}
-              className="w-full mt-4 py-3.5 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
-              style={{
-                backgroundImage: manque ? "none" : DEGRADE,
-                background: manque ? CARTE : undefined,
-                border: manque ? `1px solid ${bordure}` : "none",
-                color: manque ? texteDoux : "#fff",
-                fontFamily: TITRE, fontSize: 17, letterSpacing: ".5px",
-              }}
-            >
-              <Plus size={18} />
-              {manque
-                ? (tailles.length && !taille ? "CHOISIS TA TAILLE" : "CHOISIS TA COULEUR")
-                : `AJOUTER AU PANIER · ${euros(produit.prix * qte)}`}
-            </button>
-          ) : (
-            <p className="w-full mt-4 py-3.5 rounded-xl text-center text-[13px] font-bold"
-              style={{ background: VOILE("#262626", "D9"), color: texteDoux, border: `1px solid ${bordure}` }}>
-              Bientôt de retour
-            </p>
-          )}
-        </div>
+        <ChoixEtCommande produit={produit} onAjouter={onAjouter} />
+      </div>
       </div>
     </>
   );
@@ -899,7 +762,7 @@ export default function Boutique() {
             ) : produit ? (
               <EcranFiche famille={famille} gamme={gamme} produit={produit} onRetour={retour} onAjouter={ajouter} onOuvrir={(p, n) => setVue({ produit: p, depart: n || 0 })} onVideo={setVideo} />
             ) : famille && PRESENTATION === "marques" ? (
-              <EcranCarrousel famille={famille} onProduit={allerProduit} onRetour={retour} />
+              <EcranCarrousel famille={famille} onAjouter={ajouter} onRetour={retour} />
             ) : famille ? (
               <EcranProduits famille={famille} gamme={gamme} onProduit={allerProduit} onRetour={retour} />
             ) : PRESENTATION === "liste" ? (

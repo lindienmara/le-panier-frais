@@ -759,6 +759,155 @@ export function Carrousel({ images }) {
   );
 }
 
+/* ══════════ CHOISIR SA TAILLE, SA COULEUR, ET COMMANDER ══════════
+
+   Ce bloc vit dans le tronc commun parce que DEUX écrans s'en servent : la
+   fiche d'un produit, et le carrousel des boutiques par marques. Le recopier
+   dans les deux aurait été plus rapide à écrire, et la garantie qu'un jour
+   l'un des deux serait corrigé et pas l'autre.
+
+   Trois règles y sont tenues :
+
+     • RIEN N'EST PRÉSÉLECTIONNÉ. Choisir une pointure à la place du client,
+       c'est lui vendre une paire qu'il n'a pas demandée.
+
+     • UNE POINTURE EN RUPTURE RESTE VISIBLE, barrée. La masquer ferait croire
+       au client que le modèle ne se fait pas dans sa taille, et il partirait.
+       Barrée, il sait que c'est son modèle mais pas aujourd'hui, et il revient.
+
+     • SANS MOYEN DE COMMANDER, AUCUN BOUTON. Le prix et la fiche restent :
+       la boutique devient une vitrine, pas une boutique en panne. */
+export function ChoixEtCommande({ produit, onAjouter, compact = false }) {
+  const [qte, setQte] = useState(1);
+  const [taille, setTaille] = useState("");
+  const [couleur, setCouleur] = useState("");
+
+  const tailles = CHOIX(produit.tailles);
+  const teintes = CHOIX(produit.couleurs);
+  const epuisees = new Set(CHOIX(produit.taillesEpuisees));
+
+  // Changer de produit sans remettre les choix à zéro ferait partir un 42 pour
+  // un modèle qui ne se fait qu'en 38.
+  useEffect(() => { setTaille(""); setCouleur(""); setQte(1); }, [produit.ref, produit.nom]);
+  useEffect(() => { if (taille && epuisees.has(taille)) setTaille(""); }, [taille, produit.taillesEpuisees]);
+
+  const manque = (tailles.length && !taille) || (teintes.length && !couleur);
+
+  return (
+    <>
+      {(tailles.length > 0 || teintes.length > 0) && (
+        <div className={compact ? "" : "mt-5"}>
+          {tailles.length > 0 && (
+            <>
+              <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS }}>
+                Choisir la taille
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {tailles.map((t) => {
+                  const partie = epuisees.has(t);
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => { if (!partie) setTaille(taille === t ? "" : t); }}
+                      disabled={partie}
+                      aria-label={partie ? t + " — épuisée" : t}
+                      className="py-2.5 rounded-xl text-[14px] transition-transform"
+                      style={{
+                        background: taille === t ? texte : CARTE,
+                        color: partie ? texteDoux : taille === t ? "#0B0B0B" : texte,
+                        border: `1px solid ${taille === t ? texte : bordure}`,
+                        fontFamily: CORPS, fontWeight: taille === t ? 700 : 500,
+                        textDecoration: partie ? "line-through" : "none",
+                        opacity: partie ? 0.5 : 1,
+                        cursor: partie ? "default" : "pointer",
+                      }}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {teintes.length > 0 && (
+            <>
+              <p className="text-[11px] uppercase tracking-wider mb-2"
+                style={{ color: texteDoux, fontFamily: CORPS, marginTop: tailles.length ? 16 : 0 }}>
+                Choisir la couleur
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {teintes.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCouleur(couleur === c ? "" : c)}
+                    className="px-4 py-2.5 rounded-xl text-[14px] active:scale-95 transition-transform"
+                    style={{
+                      background: couleur === c ? texte : CARTE,
+                      color: couleur === c ? "#0B0B0B" : texte,
+                      border: `1px solid ${couleur === c ? texte : bordure}`,
+                      fontFamily: CORPS, fontWeight: couleur === c ? 700 : 500,
+                    }}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="mt-5 rounded-2xl p-4" style={{ background: CARTE, border: `1px solid ${bordure}` }}>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider" style={{ color: texteDoux, fontFamily: CORPS }}>Prix</p>
+            <Prix valeur={produit.prix} taille={32} />
+            <p className="text-[12px]" style={{ color: texteDoux, fontFamily: CORPS }}>{produit.unite}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider mb-1 text-right" style={{ color: texteDoux, fontFamily: CORPS }}>Quantité</p>
+            <div className="flex items-center gap-1 rounded-xl p-1" style={{ background: VOILE(fond, "CC"), border: `1px solid ${bordure}` }}>
+              <button onClick={() => setQte((q) => Math.max(1, q - 1))} className="w-8 h-8 rounded-lg flex items-center justify-center active:scale-90" aria-label="Moins">
+                <Minus size={14} color={texte} />
+              </button>
+              <span className="w-7 text-center font-bold" style={{ color: texte, fontFamily: CORPS }}>{qte}</span>
+              <button onClick={() => setQte((q) => q + 1)} className="w-8 h-8 rounded-lg flex items-center justify-center active:scale-90" aria-label="Plus">
+                <Plus size={14} color={texte} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {!PEUT_COMMANDER ? null : produit.dispo ? (
+          <button
+            onClick={() => { if (!manque) onAjouter(produit, qte, taille, couleur); }}
+            disabled={manque}
+            className="w-full mt-4 py-3.5 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            style={{
+              backgroundImage: manque ? "none" : DEGRADE,
+              background: manque ? CARTE : undefined,
+              border: manque ? `1px solid ${bordure}` : "none",
+              color: manque ? texteDoux : "#fff",
+              fontFamily: TITRE, fontSize: 17, letterSpacing: ".5px",
+            }}
+          >
+            <Plus size={18} />
+            {manque
+              ? (tailles.length && !taille ? "CHOISIS TA TAILLE" : "CHOISIS TA COULEUR")
+              : `AJOUTER AU PANIER · ${euros(produit.prix * qte)}`}
+          </button>
+        ) : (
+          <p className="w-full mt-4 py-3.5 rounded-xl text-center text-[13px] font-bold"
+            style={{ background: VOILE("#262626", "D9"), color: texteDoux, border: `1px solid ${bordure}` }}>
+            Bientôt de retour
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
 /* ══════════ TOUTES LES FAMILLES ══════════
    Une rangée de pastilles qui défile de côté cache ce qui dépasse de l'écran :
    passé la troisième famille, le client ne sait même pas que les autres

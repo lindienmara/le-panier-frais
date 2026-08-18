@@ -28,7 +28,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { visuelFamille, visuelProduit } from "./visuels.js";
 import {
-  FAMILLES, EST_VIDEOS, GALERIE, CLE, euros, PROPORTION_PHOTO,
+  FAMILLES, EST_VIDEOS, GALERIE, CLE, euros, PROPORTION_PHOTO, ChoixEtCommande,
   TITRE, CORPS, CARTE, bordure, texte, texteDoux, jaune,
 } from "./commun.jsx";
 
@@ -119,7 +119,7 @@ export function EcranMarques({ onFamille }) {
 
 /* ═════════ 2. LE CARROUSEL : UNE PHOTO PAR PAGE ═════════ */
 
-export function EcranCarrousel({ famille, onProduit, onRetour }) {
+export function EcranCarrousel({ famille, onAjouter, onRetour }) {
   const modeles = MODELES(famille);
   const [i, setI] = useState(0);
   const doigtX = useRef(null);
@@ -171,110 +171,101 @@ export function EcranCarrousel({ famille, onProduit, onRetour }) {
   const { produit, gamme } = modeles[Math.min(i, n - 1)];
   const photo = GALERIE(produit)[0] || visuelProduit(produit, famille.couleurs, famille.glyphe);
 
-  /* LE PLEIN ÉCRAN.
-     La photo ne partage plus la page avec l'en-tête de la boutique et la barre
-     d'onglets : elle prend tout. C'est une couche posée par-dessus le reste,
-     fixée à l'écran, au-dessus de la barre du bas.
+  /* LA PAGE D'UN MODÈLE — UNE COLONNE, DE HAUT EN BAS.
 
-     Pourquoi si radical : dans ce type de boutique, la photo EST le produit.
-     Chaque bandeau qu'on lui laisse autour lui prend de la hauteur, et sur un
-     téléphone tenu debout, la hauteur est tout ce qu'on a.
+     Version précédente : une couche plein écran, avec le nom, le prix et le
+     bouton posés SUR la photo. Sur un téléphone cela passait ; sur un écran
+     large la photo restait une colonne étroite au milieu, et le texte partait
+     se coller dans les coins noirs, très loin d'elle.
 
-     Tout ce qui reste à l'écran est donc POSÉ SUR la photo, en surimpression,
-     et sur un voile sombre pour rester lisible quelle que soit l'image. */
+     Le défaut n'était pas la largeur, c'était le principe : poser les
+     informations SUR l'image oblige à les entasser dans le peu de place qui
+     reste, et interdit d'en mettre plus. Elles sont donc maintenant SOUS elle,
+     dans le fil de la page. On voit la photo en grand, on descend, on trouve
+     les tailles, le prix et le bouton — chacun avec la place qu'il lui faut.
+
+     La colonne, elle, est celle de toute la boutique : la photo garde la forme
+     choisie dans les réglages, et rien ne s'étale sur un grand écran. */
   return (
-    <div className="fixed inset-0 z-40 select-none flex flex-col"
-      style={{ background: "#08080A" }}
-      onTouchStart={debut} onTouchEnd={fin}>
+    <div className="select-none pb-4" onTouchStart={debut} onTouchEnd={fin}>
 
-      {/* LA PHOTO, plein cadre. « contain » plutôt que « cover » : une paire de
-          chaussures coupée par le bord n'est plus une paire de chaussures. */}
-      <img
-        src={photo}
-        alt={produit.nom}
-        className="absolute inset-0 w-full h-full object-contain"
-        onError={(e) => { e.currentTarget.src = visuelProduit(produit, famille.couleurs, famille.glyphe); }}
-      />
-
-      {/* La barre du haut, en surimpression. */}
-      <div className="relative flex items-center gap-3 px-3 pt-3"
-        style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
+      {/* La barre de la marque : on sait où on est, et comment sortir. */}
+      <div className="flex items-center gap-3 px-3 py-2.5">
         <button onClick={onRetour} aria-label="Revenir aux marques"
-          className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform flex-shrink-0"
-          style={{ background: "#0C0C10D9", border: `1px solid ${bordure}` }}>
-          <ChevronLeft size={20} color="#fff" />
+          className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 transition-transform flex-shrink-0"
+          style={{ background: CARTE, border: `1px solid ${bordure}` }}>
+          <ChevronLeft size={18} color={texte} />
         </button>
-        <p className="flex-1 truncate text-center"
-          style={{ fontFamily: TITRE, fontSize: 17, color: "#fff", letterSpacing: ".5px", textShadow: "0 2px 10px rgba(0,0,0,.9)" }}>
+        <p className="flex-1 truncate" style={{ fontFamily: TITRE, fontSize: 17, color: texte, letterSpacing: ".5px" }}>
           {(famille.nom || "").toUpperCase()}
         </p>
         <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex-shrink-0"
-          style={{ background: "#0C0C10D9", border: `1px solid ${bordure}`, color: "#D8D8D8", fontFamily: CORPS }}>
+          style={{ background: CARTE, border: `1px solid ${bordure}`, color: texteDoux, fontFamily: CORPS }}>
           {i + 1} / {n}
         </span>
       </div>
 
-      {/* Les flèches, au milieu de la hauteur. */}
-      {n > 1 && (
-        <>
-          <button onClick={precedent} aria-label="Modèle précédent"
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform"
-            style={{ background: "#0C0C10D9", border: `1px solid ${bordure}` }}>
-            <ChevronLeft size={22} color="#fff" />
-          </button>
-          <button onClick={suivant} aria-label="Modèle suivant"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform"
-            style={{ background: "#0C0C10D9", border: `1px solid ${bordure}` }}>
-            <ChevronRight size={22} color="#fff" />
-          </button>
-        </>
+      {/* LA PHOTO, en grand, dans la forme choisie pour la boutique. */}
+      <div className="relative mx-3 rounded-2xl overflow-hidden"
+        style={{ aspectRatio: PROPORTION_MARQUE, background: "#08080A", border: `1px solid ${bordure}` }}>
+        <img
+          src={photo}
+          alt={produit.nom}
+          className="w-full h-full object-contain"
+          onError={(e) => { e.currentTarget.src = visuelProduit(produit, famille.couleurs, famille.glyphe); }}
+        />
+
+        {n > 1 && (
+          <>
+            <button onClick={precedent} aria-label="Modèle précédent"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+              style={{ background: "#0C0C10D9", border: `1px solid ${bordure}` }}>
+              <ChevronLeft size={20} color="#fff" />
+            </button>
+            <button onClick={suivant} aria-label="Modèle suivant"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+              style={{ background: "#0C0C10D9", border: `1px solid ${bordure}` }}>
+              <ChevronRight size={20} color="#fff" />
+            </button>
+          </>
+        )}
+
+        {!produit.dispo && (
+          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+            style={{ background: "#0C0C10E6", border: `1px solid ${bordure}`, color: "#D8D8D8", fontFamily: CORPS }}>
+            ÉPUISÉ
+          </span>
+        )}
+      </div>
+
+      {/* Les pastilles, juste sous la photo : où l'on en est dans la collection. */}
+      {n > 1 && n <= 12 && (
+        <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
+          {modeles.map((m, k) => (
+            <button key={m.cle} onClick={() => setI(k)} aria-label={`Modèle ${k + 1}`}
+              className="rounded-full transition-all"
+              style={{ width: k === i ? 22 : 7, height: 7, background: k === i ? jaune : bordure }} />
+          ))}
+        </div>
       )}
 
-      {!produit.dispo && (
-        <span className="absolute top-20 left-3 px-2.5 py-1 rounded-lg text-[11px] font-bold"
-          style={{ background: "#0C0C10E6", border: `1px solid ${bordure}`, color: "#D8D8D8", fontFamily: CORPS }}>
-          ÉPUISÉ
-        </span>
-      )}
-
-      {/* Le bas : le nom, le prix, et le bouton qui mène à la fiche. Posé sur un
-          dégradé sombre pour rester lisible sur une photo claire. */}
-      <div className="relative mt-auto px-4 pb-5"
-        style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 20px)",
-          background: "linear-gradient(to top, rgba(0,0,0,.92) 0%, rgba(0,0,0,.7) 55%, rgba(0,0,0,0) 100%)",
-          paddingTop: 56,
-        }}>
-        <p style={{ fontFamily: TITRE, fontSize: "clamp(22px, 7vw, 32px)", color: "#fff", lineHeight: 1.1 }}>
+      {/* PUIS, EN DESCENDANT : le nom, la description, les tailles, le prix et
+          le bouton. C'est le même bloc que la fiche d'un produit — il vit dans
+          le tronc commun, il n'est écrit qu'une fois. */}
+      <div className="px-3 mt-5">
+        <p style={{ fontFamily: TITRE, fontSize: "clamp(22px, 7vw, 30px)", color: texte, lineHeight: 1.1 }}>
           {(produit.nom || "").toUpperCase()}
         </p>
-        <div className="flex items-baseline gap-3 mt-1.5 flex-wrap">
-          {produit.prix > 0 && (
-            <span style={{ fontFamily: TITRE, fontSize: 22, color: jaune }}>{euros(produit.prix)}</span>
-          )}
-          {(produit.tailles || "").trim() && (
-            <span className="text-[12.5px]" style={{ color: "#D8D8D8", fontFamily: CORPS }}>
-              Tailles {produit.tailles}
-            </span>
-          )}
-        </div>
 
-        <button onClick={() => onProduit(famille, gamme, produit)}
-          className="w-full mt-4 py-3.5 rounded-xl active:scale-95 transition-transform"
-          style={{ background: "#fff", color: "#0B0B0B", fontFamily: TITRE, fontSize: 16, letterSpacing: ".5px" }}>
-          VOIR LES TAILLES ET COMMANDER
-        </button>
-
-        {/* Les pastilles : où l'on en est dans la collection. */}
-        {n > 1 && n <= 12 && (
-          <div className="flex items-center justify-center gap-1.5 mt-4 flex-wrap">
-            {modeles.map((m, k) => (
-              <button key={m.cle} onClick={() => setI(k)} aria-label={`Modèle ${k + 1}`}
-                className="rounded-full transition-all"
-                style={{ width: k === i ? 22 : 7, height: 7, background: k === i ? "#fff" : "#FFFFFF55" }} />
-            ))}
-          </div>
+        {(produit.description || "").trim() && (
+          <p className="text-[14px] mt-2" style={{ color: texteDoux, fontFamily: CORPS, lineHeight: 1.6 }}>
+            {produit.description}
+          </p>
         )}
+
+        <div className="mt-4">
+          <ChoixEtCommande produit={produit} onAjouter={onAjouter} compact />
+        </div>
       </div>
     </div>
   );
