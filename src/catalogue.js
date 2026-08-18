@@ -21,6 +21,10 @@ export const FAMILLES = [
         produits: [
           { ref: "NK-AMP", nom: "Air Max Plus", unite: "la paire", prix: 189.99, dispo: true, tailles: "38,5 · 39 · 40 · 40,5 · 41 · 42 · 42,5 · 43 · 44 · 44,5 · 45 · 45,5 · 46 · 47 · 47,5 · 48,5 · 49,5", couleurs: "Triple noir", chef: true, image: "/produits/nk-air-max-plus.jpg",
             description: "Chaussure pour homme. Maille et empiècements thermosoudés, semelle Air visible sur toute la longueur." },
+          { ref: "NK-AMP-W", nom: "Air Max Plus femme", unite: "la paire", prix: 189.99, dispo: true, tailles: "35,5 · 36 · 36,5 · 37,5 · 38 · 38,5 · 39 · 40 · 40,5 · 41 · 42 · 42,5 · 43 · 44 · 44,5", couleurs: "Blanc", chef: true, image: "/produits/nk-air-max-plus-femme.jpg",
+            description: "Chaussure pour femme, matériaux recyclés. Taille petit : prendre une demi-pointure au-dessus." },
+          { ref: "NK-AMP-S", nom: "Air Max Plus Suede", unite: "la paire", prix: 199.99, dispo: true, tailles: "35,5 · 36 · 36,5 · 37,5 · 38 · 38,5 · 39 · 40 · 40,5 · 41 · 42 · 42,5 · 43 · 44 · 44,5", couleurs: "Rose", chef: true, image: "/produits/nk-air-max-plus-suede.jpg",
+            description: "Chaussure pour femme. Daim rose sur toute la tige, semelle Air visible." },
           { ref: "NK-AF1", nom: "Air Force 1", unite: "la paire", prix: 119.9, dispo: true, tailles: "39 · 40 · 41 · 42 · 43 · 44 · 45", couleurs: "Blanc · Noir · Rouge", image: "/produits/nk-af1.svg",
             description: "Cuir pleine fleur, semelle Air. Le classique de la maison." },
           { ref: "NK-AM90", nom: "Air Max 90", unite: "la paire", prix: 149.9, dispo: true, tailles: "40 · 41 · 42 · 43 · 44", couleurs: "Gris · Blanc · Bleu marine", image: "/produits/nk-am90.svg", 

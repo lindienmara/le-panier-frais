@@ -178,12 +178,21 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
      pointure qu'il n'a pas demandée. */
   const tailles = CHOIX(produit.tailles);
   const teintes = CHOIX(produit.couleurs);
+
+  /* LES POINTURES EN RUPTURE.
+     Un magasin de chaussures a toujours des trous : le 41 est parti, le 44
+     n'est pas encore arrivé. Les MASQUER serait une faute — le client cherche
+     sa taille, ne la voit pas, et croit que le modèle ne se fait pas dans sa
+     pointure. Il faut au contraire qu'il la voie, barrée : il sait alors que
+     c'est son modèle, mais pas aujourd'hui, et il revient. */
+  const epuisees = new Set(CHOIX(produit.taillesEpuisees));
   const [taille, setTaille] = useState("");
   const [couleur, setCouleur] = useState("");
 
   // Changer de produit sans remettre les choix à zéro ferait partir un 42 pour
   // un modèle qui ne se fait qu'en 38.
   useEffect(() => { setTaille(""); setCouleur(""); setQte(1); }, [produit.ref, produit.nom]);
+  useEffect(() => { if (taille && epuisees.has(taille)) setTaille(""); }, [taille, produit.taillesEpuisees]);
 
   const manque = (tailles.length && !taille) || (teintes.length && !couleur);
   const image = visuelProduit(produit, famille.couleurs, famille.glyphe);
@@ -278,21 +287,29 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
                   Choisir la taille
                 </p>
                 <div className="grid grid-cols-3 gap-2">
-                  {tailles.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTaille(taille === t ? "" : t)}
-                      className="py-2.5 rounded-xl text-[14px] active:scale-95 transition-transform"
-                      style={{
-                        background: taille === t ? texte : CARTE,
-                        color: taille === t ? "#0B0B0B" : texte,
-                        border: `1px solid ${taille === t ? texte : bordure}`,
-                        fontFamily: CORPS, fontWeight: taille === t ? 700 : 500,
-                      }}
-                    >
-                      {t}
-                    </button>
-                  ))}
+                  {tailles.map((t) => {
+                    const partie = epuisees.has(t);
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => { if (!partie) setTaille(taille === t ? "" : t); }}
+                        disabled={partie}
+                        aria-label={partie ? t + " — épuisée" : t}
+                        className="py-2.5 rounded-xl text-[14px] transition-transform"
+                        style={{
+                          background: taille === t ? texte : CARTE,
+                          color: partie ? texteDoux : taille === t ? "#0B0B0B" : texte,
+                          border: `1px solid ${taille === t ? texte : bordure}`,
+                          fontFamily: CORPS, fontWeight: taille === t ? 700 : 500,
+                          textDecoration: partie ? "line-through" : "none",
+                          opacity: partie ? 0.5 : 1,
+                          cursor: partie ? "default" : "pointer",
+                        }}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}
