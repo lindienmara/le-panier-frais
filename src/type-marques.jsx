@@ -28,9 +28,18 @@ import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { visuelFamille, visuelProduit } from "./visuels.js";
 import {
-  FAMILLES, EST_VIDEOS, GALERIE, CLE, euros,
+  FAMILLES, EST_VIDEOS, GALERIE, CLE, euros, PROPORTION_PHOTO,
   TITRE, CORPS, CARTE, bordure, texte, texteDoux, jaune,
 } from "./commun.jsx";
+
+/* LA FORME DES TUILES DE MARQUE suit le réglage « forme des photos » de la
+   boutique : carré, portrait, paysage. Sans cela le vendeur choisirait le
+   portrait pour ses produits et retrouverait quand même un bandeau large à
+   l'accueil — deux formes pour la même photo, dans la même boutique.
+
+   « Forme d'origine » ne veut rien dire pour une tuile qui doit s'aligner avec
+   ses voisines : dans ce cas seulement, on retombe sur le portrait. */
+const PROPORTION_MARQUE = PROPORTION_PHOTO || "3 / 4";
 
 // Les marques : les familles de produits, les galeries de vidéos mises à part.
 export const MARQUES = FAMILLES.filter((f) => !EST_VIDEOS(f));
@@ -58,12 +67,17 @@ function Marque({ famille, onFamille }) {
     <button
       onClick={() => onFamille(famille)}
       className="relative block w-full overflow-hidden active:scale-[.985] transition-transform"
-      style={{ height: "clamp(190px, 30vh, 300px)", background: "#0A0A0C" }}
+      style={{ aspectRatio: PROPORTION_MARQUE, background: "#0A0A0C" }}
     >
+      {/* L'IMAGE ENTIÈRE, JAMAIS ROGNÉE.
+          Ces tuiles montrent des photos de PRODUIT — une paire de chaussures,
+          pas un décor. « object-cover » remplirait mieux le cadre, mais en
+          coupant les bords : la semelle ou le talon disparaîtraient. Une
+          chaussure amputée ne donne envie d'entrer dans aucun rayon. */}
       <img
         src={affiche}
         alt={famille.nom}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-contain"
         onError={(e) => { e.currentTarget.src = visuelFamille(famille); }}
       />
       {/* Le voile sombre : sans lui, le nom de la marque devient illisible dès

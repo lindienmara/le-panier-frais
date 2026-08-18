@@ -30,10 +30,10 @@ export const BOUTIQUE = {
   presentation: "marques",
 
   // Forme du cadre réservé aux photos : carre, portrait, paysage ou libre.
-  formatPhoto: "carre",
+  formatPhoto: "portrait",
   // true = image entière dans ce cadre, false = recadrée pour le remplir.
   // Chaque produit peut décider autrement, dans son propre champ « cadrage ».
-  imageEntiere: false,
+  imageEntiere: true,
 
   // Bloc mis en avant sur l'accueil. Vide = masqué.
   enAvant: "",

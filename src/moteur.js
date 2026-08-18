@@ -10,7 +10,7 @@
 
 export const MOTEUR = {
   modele: "vitrine-3-niveaux",
-  version: "3.24",
+  version: "3.25",
   // Ce que sait faire cette version, pour information.
   capacites: [
     "familles > gammes > produits",
@@ -49,5 +49,6 @@ export const MOTEUR = {
     "taille et couleur sur la fiche produit, affichees seulement si renseignees",
     "la taille et la couleur se choisissent au doigt et partent avec la commande",
     "les pointures en rupture sont barrees, visibles mais pas commandables",
+    "les photos de marque prennent la meme forme que les photos de produit",
   ],
 };
