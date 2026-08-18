@@ -426,10 +426,24 @@ export function MoyensDePaiement({ total = 0, reference = "" }) {
    On coupe donc sur tout ce qui sépare visiblement, et on garde l'ordre écrit :
    une pointure se lit de la plus petite à la plus grande, et le vendeur l'a
    déjà rangée ainsi. */
+/* LA VIRGULE A DEUX MÉTIERS, ET C'EST TOUT LE PROBLÈME.
+   Elle sépare — « 39, 40, 41 » — mais elle marque aussi la demi-pointure :
+   « 38,5 ». Prise pour un séparateur dans les deux cas, « 38,5 » devenait deux
+   pointures, « 38 » et « 5 ». Le client voyait une taille 5 pour homme.
+
+   La règle qui les départage tient en une observation : une demi-pointure
+   s'écrit TOUJOURS « ,5 ». Une virgule suivie d'un 5 seul est donc une
+   décimale ; toutes les autres séparent. « 39,5 · 40 » et « 39,40,41 » se
+   lisent alors correctement tous les deux.
+
+   On met la décimale à l'abri le temps de découper, puis on la remet. */
+const DECIMALE = " ";
+
 export const CHOIX = (texte) =>
   String(texte || "")
+    .replace(/(\d),(5)(?!\d)/g, "$1" + DECIMALE + "$2")
     .split(/[·,;|\/\n]+|\s{2,}/)
-    .map((x) => x.trim())
+    .map((x) => x.split(DECIMALE).join(",").trim())
     .filter(Boolean);
 
 export function texteCommande(items, reference = "") {

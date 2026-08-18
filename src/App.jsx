@@ -241,7 +241,7 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
           {produit.description}
         </p>
 
-        {/* TAILLES ET COULEURS.
+        {/* LA TAILLE, LA COULEUR, LE PRIX ET LE PANIER.
             Ce sont les deux questions qu'on pose en magasin avant toute autre,
             et les deux qui font renoncer quand la réponse manque. Elles vivent
             ici, sur la fiche commune : une boutique de chaussures en a besoin,
@@ -251,7 +251,6 @@ function EcranFiche({ famille, gamme, produit, onRetour, onAjouter, onOuvrir, on
             pas de « non renseigné ». Une boutique d'épicerie ne verra jamais
             ces deux lignes. */}
         <ChoixEtCommande produit={produit} onAjouter={onAjouter} />
-      </div>
       </div>
     </>
   );
