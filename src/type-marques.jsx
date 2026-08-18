@@ -54,6 +54,7 @@ export const MODELES = (famille) =>
 
 function Marque({ famille, onFamille }) {
   const modeles = MODELES(famille);
+  const [videoRatee, setVideoRatee] = useState(false);
 
   /* La photo de la marque si elle en a une, sinon celle de son premier modèle,
      sinon le dessin de secours. Une case vide serait la seule chose à ne pas
@@ -66,24 +67,69 @@ function Marque({ famille, onFamille }) {
   return (
     <button
       onClick={() => onFamille(famille)}
-      className="relative block w-full overflow-hidden active:scale-[.985] transition-transform"
-      style={{ aspectRatio: PROPORTION_MARQUE, background: "#0A0A0C" }}
+      className="relative block w-full overflow-hidden active:scale-[.99] transition-transform"
+      /* UNE MARQUE = UN ÉCRAN ENTIER.
+
+         La tuile ne se contente plus d'une proportion : elle prend TOUTE la
+         hauteur du téléphone. On ne voit donc qu'une marque à la fois, en
+         grand, et on fait défiler pour passer à la suivante.
+
+         « dvh » et non « vh » : sur un téléphone, la barre d'adresse du
+         navigateur apparaît et disparaît au défilement. « vh » se fige sur la
+         plus grande hauteur et laisse un bout de l'image coupé sous la barre ;
+         « dvh » suit la hauteur réellement visible. Le « vh » reste écrit
+         juste avant, pour les navigateurs qui ignorent encore « dvh ».
+
+         On retranche la barre du bas — accueil, infos, liens, avis — pour que
+         le nom de la marque ne se retrouve pas caché dessous. */
+      style={{ height: "100vh", minHeight: "100dvh", maxHeight: "100dvh", background: "#0A0A0C" }}
     >
-      {/* L'IMAGE ENTIÈRE, JAMAIS ROGNÉE.
-          Ces tuiles montrent des photos de PRODUIT — une paire de chaussures,
-          pas un décor. « object-cover » remplirait mieux le cadre, mais en
-          coupant les bords : la semelle ou le talon disparaîtraient. Une
-          chaussure amputée ne donne envie d'entrer dans aucun rayon. */}
-      <img
-        src={affiche}
-        alt={famille.nom}
-        className="w-full h-full object-contain"
-        onError={(e) => { e.currentTarget.src = visuelFamille(famille); }}
-      />
+      {/* UNE VIDÉO QUI TOURNE, SI LA MARQUE EN A UNE.
+
+          Quatre attributs, et chacun est indispensable :
+            muted     — sans le silence, AUCUN téléphone ne démarre une vidéo
+                        tout seul. C'est la règle de tous les navigateurs, et
+                        c'est elle qu'on oublie en premier.
+            playsInline — sans lui, l'iPhone passe en plein écran dès la
+                        lecture : la boutique disparaît derrière un lecteur.
+            loop      — une tuile qui s'arrête au bout de six secondes et reste
+                        figée est pire qu'une photo.
+            preload="metadata" — on ne télécharge pas les trois vidéos en
+                        entier avant d'avoir montré la page.
+
+          Et si la vidéo manque ou refuse de se lire, on retombe sur l'image :
+          une tuile noire ne dit rien à personne. */}
+      {(famille.video || "").trim() && !videoRatee ? (
+        <video
+          src={famille.video}
+          poster={affiche}
+          autoPlay muted loop playsInline
+          preload="metadata"
+          /* La vidéo REMPLIT l'écran, la photo non — et ce n'est pas une
+             inconséquence. Une vidéo de marque est un décor : on la filme pour
+             qu'elle occupe le cadre, et des bandes noires autour la ruineraient.
+             Une photo de produit, elle, montre une paire de chaussures : la
+             remplir couperait la semelle ou le talon. */
+          className="w-full h-full object-cover"
+          onError={() => setVideoRatee(true)}
+        />
+      ) : (
+        /* L'IMAGE ENTIÈRE, JAMAIS ROGNÉE.
+           Ces tuiles montrent des photos de PRODUIT — une paire de chaussures,
+           pas un décor. « object-cover » remplirait mieux le cadre, mais en
+           coupant les bords : la semelle ou le talon disparaîtraient. Une
+           chaussure amputée ne donne envie d'entrer dans aucun rayon. */
+        <img
+          src={affiche}
+          alt={famille.nom}
+          className="w-full h-full object-contain"
+          onError={(e) => { e.currentTarget.src = visuelFamille(famille); }}
+        />
+      )}
       {/* Le voile sombre : sans lui, le nom de la marque devient illisible dès
           que la photo est claire — et une photo de produit l'est souvent. */}
       <div
-        className="absolute inset-0 flex flex-col items-start justify-end px-5 pb-4"
+        className="absolute inset-0 flex flex-col items-start justify-end px-5 pb-28"
         style={{ background: "linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.25) 45%, rgba(0,0,0,0) 100%)" }}
       >
         <p style={{ fontFamily: TITRE, fontSize: "clamp(26px, 8vw, 40px)", color: "#fff", lineHeight: 1, letterSpacing: ".5px" }}>
@@ -110,8 +156,10 @@ export function EcranMarques({ onFamille }) {
     );
   }
 
+  /* Aucun espace entre les marques : chacune occupe son écran, et le passage
+     de l'une à l'autre doit être franc, sans liseré de fond au milieu. */
   return (
-    <div className="flex flex-col" style={{ gap: 3 }}>
+    <div className="flex flex-col">
       {MARQUES.map((f) => <Marque key={f.id} famille={f} onFamille={onFamille} />)}
     </div>
   );
@@ -238,14 +286,48 @@ export function EcranCarrousel({ famille, onAjouter, onRetour }) {
         )}
       </div>
 
-      {/* Les pastilles, juste sous la photo : où l'on en est dans la collection. */}
-      {n > 1 && n <= 12 && (
-        <div className="flex items-center justify-center gap-1.5 mt-3 flex-wrap">
-          {modeles.map((m, k) => (
-            <button key={m.cle} onClick={() => setI(k)} aria-label={`Modèle ${k + 1}`}
-              className="rounded-full transition-all"
-              style={{ width: k === i ? 22 : 7, height: 7, background: k === i ? jaune : bordure }} />
-          ))}
+      {/* LES AUTRES MODÈLES, EN VIGNETTES.
+
+          Des pastilles disaient seulement « il y en a trois, tu es sur la
+          deuxième ». Elles ne montraient rien. Or ce qui distingue trois TN,
+          c'est justement leur COULEUR : il faut la voir pour la choisir.
+
+          Les vignettes portent donc la photo de chaque modèle, et un doigt
+          dessus amène directement à sa page — ses photos, ses tailles, son
+          prix. C'est ce que fait la page d'une marque, et c'est ce que le
+          client connaît déjà.
+
+          La rangée défile de côté si les modèles sont nombreux ; on ne les
+          entasse pas sur plusieurs lignes, ce qui repousserait les tailles
+          hors de l'écran. */}
+      {n > 1 && (
+        <div className="mt-3 px-3">
+          <p className="text-[11px] uppercase tracking-wider mb-2" style={{ color: texteDoux, fontFamily: CORPS }}>
+            {n} modèles
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {modeles.map((m, k) => {
+              const vignette = GALERIE(m.produit)[0] || visuelProduit(m.produit, famille.couleurs, famille.glyphe);
+              const choisi = k === i;
+              return (
+                <button
+                  key={m.cle}
+                  onClick={() => setI(k)}
+                  aria-label={m.produit.nom}
+                  className="flex-shrink-0 rounded-xl overflow-hidden transition-transform active:scale-95"
+                  style={{
+                    width: 64, height: 85,
+                    background: "#08080A",
+                    border: `2px solid ${choisi ? texte : bordure}`,
+                    opacity: choisi ? 1 : 0.72,
+                  }}
+                >
+                  <img src={vignette} alt={m.produit.nom} className="w-full h-full object-contain"
+                    onError={(e) => { e.currentTarget.src = visuelProduit(m.produit, famille.couleurs, famille.glyphe); }} />
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

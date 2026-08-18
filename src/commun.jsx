@@ -437,7 +437,7 @@ export function MoyensDePaiement({ total = 0, reference = "" }) {
    lisent alors correctement tous les deux.
 
    On met la décimale à l'abri le temps de découper, puis on la remet. */
-const DECIMALE = " ";
+const DECIMALE = "\u0000";
 
 export const CHOIX = (texte) =>
   String(texte || "")
